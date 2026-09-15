@@ -1,0 +1,20 @@
+{
+  "root_dir": "./automation-work",
+  "input_dir": "inbox",
+  "state_db": ".state/processed.sqlite3",
+  "poll_seconds": 5,
+  "rules": [
+    {
+      "glob": "*.pdf",
+      "action": "move",
+      "destination": "processed/pdf",
+      "overwrite": false
+    },
+    {
+      "glob": "*.csv",
+      "action": "copy",
+      "destination": "processed/csv",
+      "overwrite": false
+    }
+  ]
+}
