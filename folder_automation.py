@@ -7,12 +7,19 @@ import shutil
 import sqlite3
 import sys
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 
 class ConfigError(RuntimeError):
     pass
+
+
+class RuleResult(str, Enum):
+    NO_MATCH = "no_match"
+    HANDLED = "handled"
+    BLOCKED = "blocked"
 
 
 class Engine:
@@ -43,10 +50,11 @@ class Engine:
         return path
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.state_db)
+        return sqlite3.connect(self.state_db, timeout=5.0)
 
     def _init_db(self) -> None:
         with self._connect() as con:
+            con.execute("PRAGMA busy_timeout=5000")
             con.execute(
                 "CREATE TABLE IF NOT EXISTS processed (signature TEXT PRIMARY KEY, processed_at TEXT DEFAULT CURRENT_TIMESTAMP)"
             )
@@ -73,32 +81,36 @@ class Engine:
         dst_dir = self._path(folder)
         return dst_dir / src.name
 
-    def apply_rule(self, src: Path, rule: dict[str, Any]) -> bool:
+    def apply_rule(self, src: Path, rule: dict[str, Any]) -> RuleResult:
         pattern = str(rule.get("glob", "*"))
         if not fnmatch.fnmatch(src.name, pattern):
-            return False
+            return RuleResult.NO_MATCH
 
         action = str(rule.get("action", "")).lower()
         if action not in {"copy", "move"}:
             raise ConfigError(f"Unsupported action: {action}")
+        if "destination" not in rule:
+            raise ConfigError("rule destination is required")
 
         dst = self.destination(str(rule["destination"]), src)
         overwrite = bool(rule.get("overwrite", False))
         print(json.dumps({"file": str(src), "action": action, "destination": str(dst), "dry_run": self.dry_run}, ensure_ascii=False))
 
         if self.dry_run:
-            return True
+            return RuleResult.HANDLED
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and not overwrite:
-            print(f"SKIP destination exists: {dst}")
-            return True
+            print(f"BLOCKED destination exists: {dst}")
+            return RuleResult.BLOCKED
         if action == "copy":
             shutil.copy2(src, dst)
         else:
             if dst.exists() and overwrite:
+                if dst.is_dir():
+                    raise ConfigError(f"Destination is a directory: {dst}")
                 dst.unlink()
             shutil.move(str(src), str(dst))
-        return True
+        return RuleResult.HANDLED
 
     def scan_once(self) -> int:
         if not self.input_dir.exists():
@@ -114,13 +126,19 @@ class Engine:
             sig = self.signature(path)
             if self.seen(sig):
                 continue
-            matched = False
+
+            processed = False
             for rule in self.rules:
-                if self.apply_rule(path, rule):
-                    matched = True
+                result = self.apply_rule(path, rule)
+                if result is RuleResult.NO_MATCH:
+                    continue
+                if result is RuleResult.HANDLED:
+                    processed = True
                     handled += 1
-                    break
-            if matched:
+                # A matching-but-blocked rule is intentionally not marked seen.
+                # Stop here so a later rule cannot silently reroute the same file.
+                break
+            if processed:
                 self.mark_seen(sig)
         return handled
 
