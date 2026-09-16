@@ -1,8 +1,30 @@
 # Folder Automation Engine
 
-指定フォルダを監視し、ファイル名・拡張子のルールに一致したファイルを**決められた処理だけ**実行するローカル自動化エンジンです。
+指定フォルダを監視し、ファイル名・拡張子のルールに一致したファイルへ**決められた処理だけ**実行するローカル自動化エンジンです。AI判断や任意コマンド実行は行いません。
 
-## MVP
+## Windows Desktop / デスクトップ
+
+通常利用ではターミナルを開かず、`desktop_app.py` / 将来のWindows EXEから操作できます。
+
+画面で確認できるもの:
+- 設定JSON
+- `root_dir` / 入力フォルダ
+- 監視間隔
+- ルール数
+- processed State DB
+- Dry Runの結果
+- 1回実行 / 監視開始 / 停止
+- 実行ログ
+
+```powershell
+python desktop_app.py
+# または
+run_desktop.bat
+```
+
+Windows EXEビルド用に `build_windows.ps1` も追加しています。
+
+## Core MVP
 
 - `*.pdf` / `*.csv` 等のglob条件
 - copy / move
@@ -11,7 +33,7 @@
 - 一定間隔の監視
 - ローカルのみで動作
 
-## 実行
+## CLI / 開発者向け
 
 ```powershell
 python folder_automation.py config.example.json --once --dry-run
@@ -28,6 +50,7 @@ python -m unittest discover -s tests -v
 - 秘密情報は扱わない
 - AI判断なし
 - SQLite接続にbusy timeoutを設定
+- GUIも既存Coreを直接使用し、別実装を持たない
 
 ### 出力先が既に存在する場合
 
@@ -40,4 +63,4 @@ python -m unittest discover -s tests -v
 
 これにより「何も処理していないのに処理済みになる」状態を防ぎます。
 
-将来、既存のPDF/Excel Privacy系ツールは、専用Adapterとして明示的に追加します。
+将来、既存のPDF/Excel Privacy系ツールは専用Adapterとして明示的に追加します。
