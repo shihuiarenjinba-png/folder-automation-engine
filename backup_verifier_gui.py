@@ -132,5 +132,8 @@ if __name__ == "__main__":
     import sys
     if "--smoke-test" in sys.argv:
         _validation_smoke()
+    elif "--e2e-test" in sys.argv:
+        from gui_e2e_harness import run
+        run(BackupVerifierGUI)
     else:
         BackupVerifierGUI().mainloop()
