@@ -18,9 +18,19 @@ jobs:
       - name: Execute tests and create UNSIGNED validation build
         shell: pwsh
         run: .\build-windows-validation.ps1
-      - name: Upload NON-RELEASE validation files
-        uses: actions/upload-artifact@v4
-        with:
-          name: folderautomationengine-unsigned-validation
-          path: dist-validation/
-          retention-days: 3
+      - name: Record unsigned validation manifest (artifact quota workaround)
+        shell: pwsh
+        run: |
+          $manifest = Get-ChildItem -Path dist-validation -Recurse -Filter validation-manifest.json | Select-Object -First 1
+          if (-not $manifest) { throw "validation-manifest.json was not generated" }
+          $result = Get-Content -LiteralPath $manifest.FullName -Raw | ConvertFrom-Json
+          @(
+            "### Windows validation build",
+            "- Product: $($result.product)",
+            "- SHA256: $($result.sha256)",
+            "- Automated tests and unsigned EXE build: succeeded",
+            "- GUI launch: NOT TESTED",
+            "- Signed: false; sales release: false",
+            "- Artifact upload: disabled because repository storage quota is exceeded",
+            "- Binaries are ephemeral in GitHub Actions and cannot be downloaded from this run"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
