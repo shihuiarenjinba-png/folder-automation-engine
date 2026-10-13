@@ -14,7 +14,7 @@ jobs:
           python-version: '3.11'
       - name: Execute tests and create UNSIGNED validation build
         shell: pwsh
-        run: .\\build-windows-validation.ps1
+        run: .\build-windows-validation.ps1
       - name: Upload NON-RELEASE validation files
         uses: actions/upload-artifact@v4
         with:
