@@ -1,0 +1,23 @@
+name: Windows Validation - Backup Restore
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-validation:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Execute tests and create UNSIGNED validation build
+        shell: pwsh
+        run: .\\build-windows-validation.ps1
+      - name: Upload NON-RELEASE validation files
+        uses: actions/upload-artifact@v4
+        with:
+          name: folderautomationengine-unsigned-validation
+          path: dist-validation/
+          retention-days: 3
