@@ -107,5 +107,30 @@ class BackupVerifierGUI(tk.Tk):
             messagebox.showerror("検証エラー", str(exc))
 
 
+
+def _validation_smoke() -> None:
+    """Noninteractive Tk widget construction smoke; not user-click testing."""
+    import json
+    import sys
+    from pathlib import Path
+    if len(sys.argv) != 4 or sys.argv[1] != "--smoke-test" or sys.argv[2] != "--smoke-output":
+        raise SystemExit(2)
+    app = BackupVerifierGUI()
+    try:
+        app.update_idletasks()
+        app.update()
+        assert app.winfo_exists() and app.title() and len(app.winfo_children()) > 0
+        result = {"status": "GUI_PROCESS_SMOKE_OK", "title": app.title(),
+                  "scope": "Tk initialization and event pump only; no simulated clicks"}
+        with Path(sys.argv[3]).open("x", encoding="utf-8") as file:
+            json.dump(result, file, ensure_ascii=False)
+    finally:
+        app.destroy()
+
+
 if __name__ == "__main__":
-    BackupVerifierGUI().mainloop()
+    import sys
+    if "--smoke-test" in sys.argv:
+        _validation_smoke()
+    else:
+        BackupVerifierGUI().mainloop()
