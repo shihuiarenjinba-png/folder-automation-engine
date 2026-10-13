@@ -71,11 +71,11 @@ def run(GUI):
                 make[0].invoke()
                 mark(f"after_manifest exists={manifest.is_file()}, app_path={app.manifest.get()!r}, errors={errors!r}, status={app.status.get()!r}")
                 assert manifest.is_file()
-                assert app.manifest.get()==str(manifest)
+                assert Path(app.manifest.get()).resolve()==manifest.resolve()
                 with patch.object(filedialog,"askopenfilename",return_value=str(manifest)):
                     browse[2].invoke()
                     mark("selected_manifest")
-                assert app.manifest.get()==str(manifest)
+                assert Path(app.manifest.get()).resolve()==manifest.resolve()
                 mark("before_verify")
                 verify_button[0].invoke()
                 mark("after_verify")
