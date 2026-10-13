@@ -132,5 +132,14 @@ if __name__ == "__main__":
     import sys
     if "--smoke-test" in sys.argv:
         _validation_smoke()
+    elif "--e2e-test" in sys.argv:
+        import traceback
+        from pathlib import Path
+        try:
+            from gui_e2e_harness import run
+            run(BackupVerifierGUI)
+        except BaseException:
+            Path(sys.argv[2]).with_suffix(".error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+            sys.exit(7)
     else:
         BackupVerifierGUI().mainloop()
