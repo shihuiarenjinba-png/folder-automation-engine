@@ -34,6 +34,8 @@ $e2eProc = Start-Process -FilePath $exe -ArgumentList @("--e2e-test", $e2eProof)
 try {
     if (-not $e2eProc.WaitForExit(60000)) {
         & taskkill.exe /F /T /PID $e2eProc.Id | Out-Null
+        $trace = [System.IO.Path]::ChangeExtension($e2eProof, ".trace.txt")
+        if (Test-Path -LiteralPath $trace) { Get-Content -LiteralPath $trace | ForEach-Object { Write-Host "E2E TRACE: $_" } }
         throw "GUI end-to-end fixture timed out"
     }
     if ($e2eProc.ExitCode -ne 0) { throw "GUI end-to-end fixture exit $($e2eProc.ExitCode)" }
