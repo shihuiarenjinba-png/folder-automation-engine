@@ -137,7 +137,7 @@ def verify(backup_dir: str | Path, manifest_file: str | Path,
         raise ValueError("Store manifest outside backup root to avoid circular verification")
     expected = _read_manifest(manifest)
     findings: list[dict] = []
-    verified: list[tuple[Path, str, int]] = []
+    verified: list[tuple[Path, str, int, str]] = []
     def issue(code: str, path: str) -> None:
         findings.append({"code": code, "path": path})
     actual_paths: set[str] = set()
@@ -172,14 +172,14 @@ def verify(backup_dir: str | Path, manifest_file: str | Path,
         if actual_sha != item["sha256"]:
             issue("hash_mismatch", rel)
             continue
-        verified.append((path, rel, item["size"]))
+        verified.append((path, rel, item["size"], item["sha256"]))
     restore_bytes = 0
     restored_count = 0
     restore_skipped_count = 0
     if restore_test_max_bytes > 0:
         with tempfile.TemporaryDirectory(prefix="backup_restore_probe_") as tmp:
             temp_root = Path(tmp)
-            for source, rel, size in verified:
+            for source, rel, size, expected_digest in verified:
                 if restore_bytes + size > restore_test_max_bytes:
                     restore_skipped_count += 1
                     continue
@@ -187,7 +187,7 @@ def verify(backup_dir: str | Path, manifest_file: str | Path,
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 with source.open("rb") as src, dest.open("xb") as dst:
                     shutil.copyfileobj(src, dst, length=1024 * 1024)
-                if filehash(dest) != filehash(source):
+                if filehash(dest) != expected_digest:
                     issue("restore_copy_mismatch", rel)
                 else:
                     restored_count += 1
@@ -201,7 +201,7 @@ def verify(backup_dir: str | Path, manifest_file: str | Path,
         "mode": FORMAT,
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "manifest_sha256": filehash(manifest),
-        "status": "REVIEW" if findings or restore_skipped_count else "HASH_CHECKED_RESTORE_SAMPLE",
+        "status": "REVIEW" if findings else ("RESTORE_SAMPLE_INCOMPLETE" if restore_skipped_count else ("HASH_CHECKED_RESTORE_SAMPLE" if restore_test_max_bytes > 0 else "HASH_CHECKED_ONLY")),
         "summary": {"expected": len(expected), "verified": len(verified),
                     "findings": len(findings), "sample_restored": restored_count,
                     "sample_restore_bytes": restore_bytes, "restore_skipped": restore_skipped_count},
