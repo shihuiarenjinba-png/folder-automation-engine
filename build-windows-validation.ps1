@@ -25,7 +25,7 @@ try {
     
     
     Invoke-Python @("-m","pip","install","pyinstaller>=6.10,<7")
-    Invoke-Python @("-m","unittest","discover","-s","tests","-p","test_backup_restore_verifier.py","-v")
+    Invoke-Python @("-m","unittest","discover","-s","tests","-p","test_*.py","-v")
     Invoke-Python @("-m","PyInstaller","--noconfirm","--clean","--onedir","--windowed",
         "--name","BackupRestoreVerifier","--distpath",$out,"--workpath",$work,"--specpath",$spec,
         "backup_verifier_gui.py")
