@@ -49,3 +49,8 @@ python folder_automation.py config.example.json
 - **必須前提**: baseline manifestは**バックアップ前の信頼できる元データ**から別の安全な場所へ保存する。破損後のデータから生成したmanifestでは復旧可能性を証明できません。
 - **制限**: アプリやDBの整合性、NTFS ACL/ADS、復元先でのアプリ起動は未検査。manfest自体の真正性を保証する電子署名も未実装。
 - Windows実機・大容量検査・リンク・権限・大量ファイル検証が販売前に必要です。
+
+### Windows画面
+- GUI: `python backup_verifier_gui.py`
+- 既存のフォルダ監視GUIとは独立して実行されます。
+- 検証前に基準manifestを作る操作と、バックアップを照合する操作を分離しています。
