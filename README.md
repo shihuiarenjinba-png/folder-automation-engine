@@ -62,3 +62,8 @@ python folder_automation.py config.example.json
 
 バックアップ整合性テストを通してから検証用EXEを生成します。生成物は `dist-validation/` 下、署名・販売承認は行いません。
 GitHub Actionsは `.github/workflows/windows-validation.yml` から**手動実行**します。
+
+
+## Windows QA evidence and manual acceptance (2026-10-13)
+
+See [Windows QA Runbook](docs/WINDOWS_QA_RUNBOOK.md) for unsigned build verification, manual checks and local evidence. **This is not a sales release.**
