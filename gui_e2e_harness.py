@@ -69,7 +69,7 @@ def run(GUI):
                 assert len(make)==len(verify_button)==1
                 mark("before_manifest")
                 make[0].invoke()
-                mark("after_manifest")
+                mark(f"after_manifest exists={manifest.is_file()}, app_path={app.manifest.get()!r}, errors={errors!r}, status={app.status.get()!r}")
                 assert manifest.is_file()
                 assert app.manifest.get()==str(manifest)
                 with patch.object(filedialog,"askopenfilename",return_value=str(manifest)):
