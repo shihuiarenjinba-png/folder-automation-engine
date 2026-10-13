@@ -54,3 +54,11 @@ python folder_automation.py config.example.json
 - GUI: `python backup_verifier_gui.py`
 - 既存のフォルダ監視GUIとは独立して実行されます。
 - 検証前に基準manifestを作る操作と、バックアップを照合する操作を分離しています。
+
+
+### Windows検証ビルド（未署名）
+
+`powershell -ExecutionPolicy Bypass -File .\\build-windows-validation.ps1`
+
+バックアップ整合性テストを通してから検証用EXEを生成します。生成物は `dist-validation/` 下、署名・販売承認は行いません。
+GitHub Actionsは `.github/workflows/windows-validation.yml` から**手動実行**します。
