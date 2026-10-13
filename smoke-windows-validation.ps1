@@ -38,7 +38,11 @@ try {
         if (Test-Path -LiteralPath $trace) { Get-Content -LiteralPath $trace | ForEach-Object { Write-Host "E2E TRACE: $_" } }
         throw "GUI end-to-end fixture timed out"
     }
-    if ($e2eProc.ExitCode -ne 0) { throw "GUI end-to-end fixture exit $($e2eProc.ExitCode)" }
+    if ($e2eProc.ExitCode -ne 0) {
+        $errorProof = [System.IO.Path]::ChangeExtension($e2eProof, ".error.txt")
+        if (Test-Path -LiteralPath $errorProof) { Get-Content -LiteralPath $errorProof | ForEach-Object { Write-Host "E2E ERROR: $_" } }
+        throw "GUI end-to-end fixture exit $($e2eProc.ExitCode)"
+    }
     if (-not (Test-Path -LiteralPath $e2eProof)) { throw "E2E proof not created" }
     $e2eResult = Get-Content -LiteralPath $e2eProof -Raw | ConvertFrom-Json
     if ($e2eResult.status -ne "GUI_E2E_OK" -or
