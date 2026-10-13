@@ -11,6 +11,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from backup_restore_verifier import snapshot, verify
+from ui_preferences import load_preferences, save_preferences
 
 
 class BackupVerifierGUI(tk.Tk):
@@ -25,6 +26,17 @@ class BackupVerifierGUI(tk.Tk):
         self.reports = tk.StringVar(value=str(Path.home() / "Documents"))
         self.maxmb = tk.IntVar(value=100)
         self.status = tk.StringVar(value="最初にバックアップ前の元データから基準manifestを作成します。")
+        try:
+            prefs = load_preferences("BackupRestoreVerifier", ("reports", "maxmb"))
+            if "maxmb" in prefs:
+                limit = int(prefs["maxmb"])
+                if not 0 <= limit <= 5000:
+                    raise ValueError("Invalid restore verification limit")
+                self.maxmb.set(limit)
+            if "reports" in prefs:
+                self.reports.set(prefs["reports"])
+        except (OSError, ValueError) as exc:
+            self.status.set("保存設定を読み込めませんでした: " + str(exc))
         frame = ttk.Frame(self, padding=18)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
@@ -49,6 +61,18 @@ class BackupVerifierGUI(tk.Tk):
         ttk.Label(frame,
                   text="これはバイト単位の照合・一時復元コピーの確認です。アプリやデータベース全体の復旧保証ではありません。",
                   wraplength=790).grid(row=10, column=0, columnspan=3, sticky="w", pady=10)
+        ttk.Button(frame, text="設定を保存", command=self.save_user_preferences).grid(row=11, column=0, columnspan=3, sticky="w", pady=5)
+
+    def save_user_preferences(self) -> None:
+        try:
+            limit = self.maxmb.get()
+            if not 0 <= limit <= 5000:
+                raise ValueError("一時復元の上限は0～5000MBにしてください")
+            save_preferences("BackupRestoreVerifier", {"reports": self.reports.get(), "maxmb": str(limit)}, ("reports", "maxmb"))
+            self.status.set("レポート出力先と一時復元上限を保存しました。")
+        except (OSError, ValueError, tk.TclError) as exc:
+            self.status.set(f"設定保存失敗: {exc}")
+            messagebox.showerror("設定保存失敗", str(exc))
 
     def _row(self, parent, row, label, variable, kind) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=6)
@@ -141,5 +165,8 @@ if __name__ == "__main__":
         except BaseException:
             Path(sys.argv[2]).with_suffix(".error.txt").write_text(traceback.format_exc(), encoding="utf-8")
             sys.exit(7)
+    elif "--preferences-ci" in sys.argv:
+        from preferences_ci import run
+        run(BackupVerifierGUI, "BackupRestoreVerifier", {"reports":"C:\\QA\\復元チェック","maxmb":"120"})
     else:
         BackupVerifierGUI().mainloop()
