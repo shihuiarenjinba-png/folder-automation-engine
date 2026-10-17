@@ -9,9 +9,10 @@ import shutil
 import sqlite3
 import sys
 import time
+from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 class ConfigError(RuntimeError):
@@ -51,8 +52,14 @@ class Engine:
             raise ConfigError(f"Path is outside root_dir: {path}") from exc
         return path
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.state_db)
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        con = sqlite3.connect(self.state_db)
+        try:
+            with con:
+                yield con
+        finally:
+            con.close()
 
     def _init_db(self) -> None:
         with self._connect() as con:
