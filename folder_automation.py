@@ -3,16 +3,25 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
+import tempfile
 import shutil
 import sqlite3
 import sys
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 
 class ConfigError(RuntimeError):
     pass
+
+
+class RuleResult(str, Enum):
+    NO_MATCH = "no_match"
+    HANDLED = "handled"
+    BLOCKED = "blocked"
 
 
 class Engine:
@@ -73,32 +82,61 @@ class Engine:
         dst_dir = self._path(folder)
         return dst_dir / src.name
 
-    def apply_rule(self, src: Path, rule: dict[str, Any]) -> bool:
+    @staticmethod
+    def _replace_safely(src: Path, dst: Path, *, move: bool) -> None:
+        """Stage the replacement before touching the existing destination."""
+        fd, tmp_name = tempfile.mkstemp(prefix=".folder-automation-", suffix=".tmp", dir=dst.parent)
+        os.close(fd)
+        tmp = Path(tmp_name)
+        try:
+            shutil.copy2(src, tmp)
+            os.replace(tmp, dst)
+            if move:
+                src.unlink()
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def apply_rule(self, src: Path, rule: dict[str, Any]) -> RuleResult:
         pattern = str(rule.get("glob", "*"))
         if not fnmatch.fnmatch(src.name, pattern):
-            return False
+            return RuleResult.NO_MATCH
 
         action = str(rule.get("action", "")).lower()
         if action not in {"copy", "move"}:
             raise ConfigError(f"Unsupported action: {action}")
+        if "destination" not in rule:
+            raise ConfigError("rule destination is required")
 
         dst = self.destination(str(rule["destination"]), src)
-        overwrite = bool(rule.get("overwrite", False))
-        print(json.dumps({"file": str(src), "action": action, "destination": str(dst), "dry_run": self.dry_run}, ensure_ascii=False))
+        # Never operate on the source as its own destination, including with
+        # overwrite=true. Resolving also prevents a symlink from escaping root.
+        if src.resolve() == dst.resolve() or (dst.exists() and src.samefile(dst)):
+            raise ConfigError(f"Source and destination refer to the same file: {src}")
+        if dst.is_symlink():
+            raise ConfigError(f"Symlink destination is not supported: {dst}")
+        self._path(str(dst))
+        if dst.exists() and dst.is_dir():
+            raise ConfigError(f"Destination is a directory: {dst}")
 
-        if self.dry_run:
-            return True
-        dst.parent.mkdir(parents=True, exist_ok=True)
+        overwrite = bool(rule.get("overwrite", False))
+        print(json.dumps({"file": str(src), "action": action, "destination": str(dst),
+                          "dry_run": self.dry_run, "overwrite": overwrite}, ensure_ascii=False))
+        # A blocked match must not be marked seen or fall through to a later
+        # rule; check this even in dry-run so the preview is accurate.
         if dst.exists() and not overwrite:
-            print(f"SKIP destination exists: {dst}")
-            return True
-        if action == "copy":
+            print(f"BLOCKED destination exists: {dst}")
+            return RuleResult.BLOCKED
+        if self.dry_run:
+            return RuleResult.HANDLED
+
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists() and overwrite:
+            self._replace_safely(src, dst, move=(action == "move"))
+        elif action == "copy":
             shutil.copy2(src, dst)
         else:
-            if dst.exists() and overwrite:
-                dst.unlink()
             shutil.move(str(src), str(dst))
-        return True
+        return RuleResult.HANDLED
 
     def scan_once(self) -> int:
         if not self.input_dir.exists():
@@ -109,18 +147,25 @@ class Engine:
 
         handled = 0
         for path in sorted(self.input_dir.iterdir()):
+            if path.is_symlink():
+                print(f"SKIP symlink source: {path}")
+                continue
             if not path.is_file():
                 continue
             sig = self.signature(path)
             if self.seen(sig):
                 continue
-            matched = False
+            processed = False
             for rule in self.rules:
-                if self.apply_rule(path, rule):
-                    matched = True
+                result = self.apply_rule(path, rule)
+                if result is RuleResult.NO_MATCH:
+                    continue
+                if result is RuleResult.HANDLED:
+                    processed = True
                     handled += 1
-                    break
-            if matched:
+                # A blocked matching rule cannot silently reroute to another destination.
+                break
+            if processed:
                 self.mark_seen(sig)
         return handled
 
