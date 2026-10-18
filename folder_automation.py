@@ -170,8 +170,14 @@ class Engine:
 
         handled = 0
         for path in sorted(self.input_dir.iterdir()):
-            if path.is_symlink():
-                print(f"SKIP symlink source: {path}")
+            # Windows junctions and other reparse points must not be
+            # automatically consumed, even if pathlib reports a regular file.
+            try:
+                stat = path.lstat()
+            except OSError:
+                continue
+            if path.is_symlink() or getattr(stat, "st_file_attributes", 0) & 0x400:
+                print(f"SKIP linked/reparse source: {path}")
                 continue
             if not path.is_file():
                 continue
