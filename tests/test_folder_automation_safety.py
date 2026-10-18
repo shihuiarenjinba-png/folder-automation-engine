@@ -145,6 +145,89 @@ class FolderAutomationSafetyTests(unittest.TestCase):
             self.assertEqual(dst.read_text(encoding="utf-8"), "old")
             self.assertEqual(list((root / "processed").glob(".folder-automation-*.tmp")), [])
 
+    def test_copy_destination_appearing_during_save_is_never_overwritten(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for sub in ("inbox", "processed"):
+                (root / sub).mkdir()
+            source = root / "inbox" / "demo.txt"
+            target = root / "processed" / "demo.txt"
+            source.write_text("original source", encoding="utf-8")
+            engine = make_engine(root, action="copy")
+            original_link = __import__("os").link
+
+            def concurrent_writer(staged, destination):
+                if Path(destination) == target:
+                    target.write_text("competing writer", encoding="utf-8")
+                return original_link(staged, destination)
+
+            with patch("folder_automation.os.link", side_effect=concurrent_writer):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(engine.scan_once(), 0)
+            self.assertEqual(target.read_text(encoding="utf-8"), "competing writer")
+            self.assertEqual(source.read_text(encoding="utf-8"), "original source")
+            self.assertEqual(list((root / "processed").glob(".folder-automation-*")), [])
+            self.assertFalse(engine.seen(engine.signature(source)))
+
+    def test_move_destination_appearing_during_save_keeps_source(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for sub in ("inbox", "processed"):
+                (root / sub).mkdir()
+            source = root / "inbox" / "demo.txt"
+            target = root / "processed" / "demo.txt"
+            source.write_text("move me", encoding="utf-8")
+            engine = make_engine(root, action="move")
+            original_link = __import__("os").link
+
+            def concurrent_writer(staged, destination):
+                target.write_text("winner", encoding="utf-8")
+                return original_link(staged, destination)
+
+            with patch("folder_automation.os.link", side_effect=concurrent_writer):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(engine.scan_once(), 0)
+            self.assertEqual(target.read_text(encoding="utf-8"), "winner")
+            self.assertEqual(source.read_text(encoding="utf-8"), "move me")
+
+    def test_copy_failure_before_publish_retains_existing_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for sub in ("inbox", "processed"):
+                (root / sub).mkdir()
+            source = root / "inbox" / "demo.txt"
+            target = root / "processed" / "demo.txt"
+            source.write_text("new", encoding="utf-8")
+            target.write_text("old", encoding="utf-8")
+            engine = make_engine(root, action="copy", overwrite=True)
+            with patch("folder_automation.shutil.copy2", side_effect=OSError("disk full")):
+                with self.assertRaisesRegex(OSError, "disk full"):
+                    engine.scan_once()
+            self.assertEqual(source.read_text(encoding="utf-8"), "new")
+            self.assertEqual(target.read_text(encoding="utf-8"), "old")
+
+    def test_changed_source_during_staging_is_not_published(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for sub in ("inbox", "processed"):
+                (root / sub).mkdir()
+            source = root / "inbox" / "demo.txt"
+            target = root / "processed" / "demo.txt"
+            source.write_text("first version", encoding="utf-8")
+            engine = make_engine(root, action="move")
+            original_copy = __import__("shutil").copy2
+
+            def change_mid_copy(a, b):
+                original_copy(a, b)
+                source.write_text("a NEWER version with more content", encoding="utf-8")
+
+            with patch("folder_automation.shutil.copy2", side_effect=change_mid_copy):
+                with self.assertRaisesRegex(ConfigError, "Source changed"):
+                    engine.scan_once()
+            self.assertFalse(target.exists())
+            self.assertEqual(source.read_text(encoding="utf-8"), "a NEWER version with more content")
+            self.assertEqual(list((root / "processed").glob(".folder-automation-*")), [])
+
     def test_move_with_explicit_overwrite_replaces_after_staging(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
