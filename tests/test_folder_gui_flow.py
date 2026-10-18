@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from folder_automation import ConfigError
-from folder_desktop_flow import build_config, revision
+from folder_desktop_flow import build_config, revision, snapshot_inputs
 from folder_desktop_app import FolderDesktop
 
 
@@ -116,6 +116,57 @@ class FolderGuiGateTests(unittest.TestCase):
             self.app.save_config()
         self.assertEqual(config.read_text(encoding="utf-8"), "valuable settings")
         error.assert_called_once()
+
+    def test_snapshot_invalidates_preview_when_file_appears(self):
+        root = Path(self.tmp.name)
+        inbox = root / "inbox"
+        inbox.mkdir()
+        first = snapshot_inputs(self.cfg)
+        (inbox / "new.pdf").write_bytes(b"new PDF")
+        self.assertNotEqual(first, snapshot_inputs(self.cfg))
+
+    def test_changed_file_and_removed_file_require_new_preview(self):
+        root = Path(self.tmp.name)
+        inbox = root / "inbox"
+        inbox.mkdir()
+        file = inbox / "new.pdf"
+        file.write_bytes(b"old")
+        original = snapshot_inputs(self.cfg)
+        file.write_bytes(b"different size now")
+        self.assertNotEqual(original, snapshot_inputs(self.cfg))
+        file.unlink()
+        self.assertNotEqual(original, snapshot_inputs(self.cfg))
+
+    def test_live_worker_fails_closed_if_files_changed_after_preview(self):
+        import queue
+        from types import SimpleNamespace
+        root = Path(self.tmp.name)
+        inbox = root / "inbox"
+        inbox.mkdir()
+        app = self.app
+        app.preview_input_snapshot = snapshot_inputs(self.cfg)
+        (inbox / "unexpected.pdf").write_bytes(b"unexpected")
+        app.messages = queue.Queue()
+        app.set_busy = Mock()
+        with patch("folder_desktop_app.threading.Thread",
+                   side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            app.start_worker("live", self.cfg)
+        event = app.messages.get_nowait()
+        self.assertFalse(event[1])
+        self.assertIn("Files changed", event[2])
+        self.assertTrue((inbox / "unexpected.pdf").exists())
+        self.assertFalse((root / "processed").exists())
+
+    def test_symlink_input_folder_is_refused(self):
+        root = Path(self.tmp.name)
+        external = root / "external"
+        external.mkdir()
+        try:
+            (root / "inbox").symlink_to(external, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(str(exc))
+        with self.assertRaises(ConfigError):
+            snapshot_inputs(self.cfg)
 
 
 if __name__ == "__main__":
