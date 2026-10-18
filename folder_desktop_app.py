@@ -294,6 +294,28 @@ class FolderDesktop:
             messagebox.showerror(self.t("保存エラー", "Save failed"), str(exc), parent=self.root)
 
 
+def self_test() -> int:
+    """Exercise installed engine wiring without opening windows or touching user files."""
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="folder-desktop-selftest-") as folder:
+        root = Path(folder)
+        inbox = root / "inbox"
+        inbox.mkdir()
+        (inbox / "sample.pdf").write_bytes(b"self-test only")
+        config = build_config(
+            root_dir=str(root), input_folder="inbox", output_folder="processed",
+            filename_glob="*.pdf", action="copy",
+        )
+        if config["rules"][0]["overwrite"] is not False:
+            raise RuntimeError("Unsafe overwrite in default rule")
+        with contextlib.redirect_stdout(io.StringIO()):
+            handled = Engine(config, dry_run=True).scan_once()
+        if handled != 1 or (root / "processed").exists() or (root / ".state").exists():
+            raise RuntimeError("Packaged Dry Run did not preserve local files")
+    print("FOLDER_DESKTOP_SELF_TEST_OK")
+    return 0
+
+
 def main() -> None:
     root = tk.Tk()
     FolderDesktop(root)
@@ -301,4 +323,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["--self-test"]:
+        raise SystemExit(self_test())
     main()
