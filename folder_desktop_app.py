@@ -51,8 +51,17 @@ class FolderDesktop:
         self.displayed_language = self.lang.get()
         for child in self.root.winfo_children():
             child.destroy()
-        frame = ttk.Frame(self.root, padding=18)
-        frame.pack(fill="both", expand=True)
+        canvas = tk.Canvas(self.root, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        frame = ttk.Frame(canvas, padding=18)
+        window = canvas.create_window((0, 0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda _event: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(
+            window, width=event.width))
         heading = ttk.Frame(frame)
         heading.pack(fill="x")
         ttk.Label(
