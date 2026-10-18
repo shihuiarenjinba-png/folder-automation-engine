@@ -14,8 +14,11 @@ def _child_name(value: str, label: str) -> str:
         raise ConfigError(f"{label}: enter one folder name inside the selected root")
     if result.endswith((" ", ".")) or ":" in result or PureWindowsPath(result).is_absolute():
         raise ConfigError(f"{label}: unsupported Windows folder name")
-    if result.lower() in {".state", "con", "prn", "aux", "nul"}:
-        raise ConfigError(f"{label}: reserved folder name")
+    reserved = {".state", "con", "prn", "aux", "nul"} | {
+        f"{prefix}{number}" for prefix in ("com", "lpt") for number in range(1, 10)
+    }
+    if result.lower() in reserved:
+        raise ConfigError(f"{label}: reserved Windows folder name")
     return result
 
 
