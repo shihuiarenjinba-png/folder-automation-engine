@@ -4,7 +4,7 @@
 
 ## 日本語
 
-**製品名（予約済み）:** folder automation engine
+**製品名（予約済み）:** Folder Automation Engine
 
 **短い説明:**
 条件に合うファイルを、指定フォルダーへ安全にコピー・移動するオフラインWindowsアプリ。実行前の試運転に対応。
