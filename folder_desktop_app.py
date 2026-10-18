@@ -14,7 +14,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from folder_automation import Engine
+from folder_automation import ConfigError, Engine
 from folder_desktop_flow import build_config, revision
 
 
@@ -25,6 +25,7 @@ class FolderDesktop:
         self.root.geometry("900x690")
         self.root.minsize(720, 570)
         self.lang = tk.StringVar(value="日本語")
+        self.displayed_language = "日本語"
         self.root_path = tk.StringVar()
         self.input_folder = tk.StringVar(value="inbox")
         self.output_folder = tk.StringVar(value="processed")
@@ -41,6 +42,7 @@ class FolderDesktop:
         return en if self.lang.get() == "English" else ja
 
     def build(self) -> None:
+        self.displayed_language = self.lang.get()
         for child in self.root.winfo_children():
             child.destroy()
         frame = ttk.Frame(self.root, padding=18)
@@ -131,7 +133,7 @@ class FolderDesktop:
 
     def change_language(self, _event=None) -> None:
         if self.busy:
-            self.lang.set("English" if self.root.title().endswith("English") else "日本語")
+            self.lang.set(self.displayed_language)
             return
         self.build()
 
@@ -169,7 +171,7 @@ class FolderDesktop:
             return
         try:
             config = self.get_config()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, ConfigError) as exc:
             messagebox.showerror(self.t("設定エラー", "Invalid configuration"), str(exc), parent=self.root)
             return
         self.preview_revision = None
@@ -180,7 +182,7 @@ class FolderDesktop:
             return
         try:
             config = self.get_config()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, ConfigError) as exc:
             messagebox.showerror(self.t("設定エラー", "Invalid configuration"), str(exc), parent=self.root)
             return
         if self.preview_revision != revision(config):
@@ -195,7 +197,7 @@ class FolderDesktop:
             f"「{config['input_dir']}」内の {config['rules'][0]['glob']} を「{config['rules'][0]['destination']}」へ "
             f"{'コピー' if self.action.get() == 'copy' else '移動'}します。既存ファイルは上書きしません。実行しますか？",
             f"Files matching {config['rules'][0]['glob']} in {config['input_dir']} will be "
-            f"{self.action.get()}d to {config['rules'][0]['destination']}. Never overwrite existing files. Continue?",
+            f"{'copied' if self.action.get() == 'copy' else 'moved'} to {config['rules'][0]['destination']}. Never overwrite existing files. Continue?",
         )
         if not messagebox.askyesno(self.t("変更を承認", "Confirm filesystem changes"), warning, parent=self.root):
             return
@@ -227,7 +229,7 @@ class FolderDesktop:
                 if ok and mode == "preview":
                     try:
                         self.preview_revision = rev if revision(self.get_config()) == rev else None
-                    except (OSError, ValueError):
+                    except (OSError, ValueError, ConfigError):
                         self.preview_revision = None
                     self.status.set(self.t(
                         "試運転が完了しました。設定を確認してから実行してください。",
@@ -250,7 +252,7 @@ class FolderDesktop:
             return
         try:
             config = self.get_config()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, ConfigError) as exc:
             messagebox.showerror(self.t("設定エラー", "Invalid configuration"), str(exc), parent=self.root)
             return
         name = filedialog.asksaveasfilename(
