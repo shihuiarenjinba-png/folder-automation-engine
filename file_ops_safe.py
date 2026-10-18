@@ -41,7 +41,7 @@ def copy_or_move(source: Path, destination: Path, *, move: bool = False, overwri
     temp = Path(name)
     try:
         shutil.copy2(src, temp)
-        with temp.open('rb') as f:
+        with temp.open('rb+') as f:
             os.fsync(f.fileno())
         current = src.stat()
         if current.st_size != prior.st_size or current.st_mtime_ns != prior.st_mtime_ns:
