@@ -71,6 +71,7 @@ class FolderGuiGateTests(unittest.TestCase):
         app = FolderDesktop.__new__(FolderDesktop)
         app.busy = False
         app.preview_revision = None
+        app.preview_input_snapshot = ()
         app.get_config = Mock(return_value=self.cfg)
         app.root = None
         app.t = lambda ja, en: en
