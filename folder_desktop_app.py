@@ -294,14 +294,25 @@ class FolderDesktop:
                 if snapshot_inputs(config) != expected:
                     raise ConfigError("Files changed after Dry Run; restart preview")
                 engine = Engine(config, dry_run=False)
+                previous = expected
                 while not self.watch_stop.is_set():
+                    # Future files must be unchanged across two scans. A file
+                    # still being written may not be copied at first sight.
+                    current = snapshot_inputs(config)
+                    stable = {item[0] for item in current if item in previous}
+                    eligible = set()
+                    for name in stable:
+                        source_path = engine.input_dir / name
+                        if source_path.is_file() and not source_path.is_symlink():
+                            eligible.add(engine.signature(source_path))
                     buffer.seek(0)
                     buffer.truncate()
                     with contextlib.redirect_stdout(buffer):
-                        count = engine.scan_once()
+                        count = engine.scan_once(eligible_signatures=eligible)
                     if count or buffer.getvalue():
                         self.messages.put(("watch", True, f"{count} file(s)\n{buffer.getvalue()}",
                                            "", None))
+                    previous = current
                     if self.watch_stop.wait(interval):
                         break
             except Exception as exc:
