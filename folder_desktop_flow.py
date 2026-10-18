@@ -60,3 +60,26 @@ def build_config(
 def revision(config: dict) -> str:
     stable = json.dumps(config, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(stable.encode("utf-8")).hexdigest()
+
+
+def snapshot_inputs(config: dict) -> tuple:
+    """Capture visible regular-file metadata without writing or following links.
+
+    An unexpected change between Dry Run and the approved live run forces
+    another preview. The worker rechecks before scanning. This is not an
+    atomic transaction against concurrent writers; Engine protects writes.
+    """
+    source = Path(config["root_dir"]) / str(config["input_dir"])
+    if source.is_symlink():
+        raise ConfigError("Input folder is a symbolic link / 入力先のリンクは利用できません")
+    if not source.exists():
+        return ("MISSING",)
+    if not source.is_dir():
+        raise ConfigError("Input path must be a directory / 入力先はフォルダーにしてください")
+    result = []
+    for path in sorted(source.iterdir(), key=lambda x: x.name):
+        if path.is_symlink() or not path.is_file():
+            continue
+        info = path.stat()
+        result.append((path.name, info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns))
+    return tuple(result)
