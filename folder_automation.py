@@ -90,15 +90,32 @@ class Engine:
         return dst_dir / src.name
 
     @staticmethod
-    def _replace_safely(src: Path, dst: Path, *, move: bool) -> None:
-        """Stage the replacement before touching the existing destination."""
+    def _replace_safely(src: Path, dst: Path, *, move: bool, overwrite: bool) -> None:
+        """Copy into a same-directory temp, then publish atomically.
+
+        For overwrite=false, os.link is an atomic create-if-absent. It must
+        fail rather than silently copying over a file that appeared after
+        the preflight check. Unsupported filesystems fail closed.
+        """
+        before = src.stat()
         fd, tmp_name = tempfile.mkstemp(prefix=".folder-automation-", suffix=".tmp", dir=dst.parent)
         os.close(fd)
         tmp = Path(tmp_name)
         try:
             shutil.copy2(src, tmp)
-            os.replace(tmp, dst)
+            after = src.stat()
+            signature = lambda stat: (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
+            if signature(before) != signature(after):
+                raise ConfigError(f"Source changed while copying; original retained: {src}")
+            if overwrite:
+                os.replace(tmp, dst)
+            else:
+                os.link(tmp, dst)
+                tmp.unlink()
             if move:
+                # Refuse to delete a source that changed during publication.
+                if signature(src.stat()) != signature(before):
+                    raise ConfigError(f"Source changed during move; original retained: {src}")
                 src.unlink()
         finally:
             tmp.unlink(missing_ok=True)
@@ -137,12 +154,11 @@ class Engine:
             return RuleResult.HANDLED
 
         dst.parent.mkdir(parents=True, exist_ok=True)
-        if dst.exists() and overwrite:
-            self._replace_safely(src, dst, move=(action == "move"))
-        elif action == "copy":
-            shutil.copy2(src, dst)
-        else:
-            shutil.move(str(src), str(dst))
+        try:
+            self._replace_safely(src, dst, move=(action == "move"), overwrite=overwrite)
+        except FileExistsError:
+            print(f"BLOCKED destination appeared during publication: {dst}")
+            return RuleResult.BLOCKED
         return RuleResult.HANDLED
 
     def scan_once(self) -> int:
