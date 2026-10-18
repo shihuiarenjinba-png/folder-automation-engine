@@ -64,3 +64,25 @@ python folder_desktop_app.py
       signing/Store validation, formal code-operator release QA
 
 Do not edit existing main or publish from this prototype branch.
+
+## Additional non-device QA and product understanding (2026-10-18)
+
+The first screen explains that the product **copies or moves files by a
+filename rule** and shows `Main folder → Input/Output folders → Dry Run →
+Confirm once`. The form does not silently overwrite customer files.
+A successful preview now snapshots input file names, inode/file IDs,
+sizes and modification timestamps. The worker requires the same set just
+before live processing; a change refuses live action and demands another
+preview. This is best-effort detection, not atomic locking against external
+filesystem writers. Race-free destination creation remains the engine's duty.
+
+Tests added in `tests/test_folder_gui_flow.py`: files added after preview,
+file content/size changed, input file deleted, linked input folder refused,
+live worker stops before writes on mismatched inputs. Previous coverage
+remains for no-overwrite rules, approval, and JSON preservation.
+
+Owner-selected Store identity is in
+`store/PARTNER_CENTER_IDENTITY_HANDOFF_20261018.md`.
+**Desktop entrypoint is `folder_desktop_app.py`, not the independent
+`backup_verifier_gui.py`.** Build operator must choose the product scope
+before packaging and must verify real GUI size/DPI and long paths on Windows.
