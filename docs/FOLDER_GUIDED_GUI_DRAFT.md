@@ -102,9 +102,11 @@ does not run while the PC/application is off.
 
 ### Not yet complete / commercial HOLD
 - This is single-rule watch, not a no-code editor for multiple ordered rules.
-- Unannounced new files may still be in the middle of being written by another
-  application. Add a stable-file delay and stage/atomic source checks before
-  broad consumer rollout.
+- New incoming files are now deferred until their file ID, length and
+  modification timestamp remain unchanged across consecutive watcher scans.
+  This reduces early partial-copy risk but does **not** guarantee no
+  simultaneous external file writes; engine stage-and-recheck protection and
+  real app producer/consumer tests remain mandatory.
 - Watched network drives, OneDrive, FAT/exFAT, permissions and hard-link
   restrictions must be tested in a disposable directory.
 - Automated watcher consent/no-preview tests are authored in
