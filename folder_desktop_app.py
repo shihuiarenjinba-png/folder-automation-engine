@@ -35,6 +35,10 @@ class FolderDesktop:
         self.preview_revision: str | None = None
         self.preview_input_snapshot: tuple | None = None
         self.busy = False
+        self.watch_active = False
+        self.watch_stop = threading.Event()
+        self.watch_thread: threading.Thread | None = None
+        self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
         self.root.after(100, self.poll)
@@ -118,6 +122,21 @@ class FolderDesktop:
             buttons, text=self.t("設定JSONを新規保存", "Save a new JSON config"), command=self.save_config
         )
         self.save_btn.pack(side="left")
+        watcher = ttk.LabelFrame(frame, text=self.t("④ 安全な常時監視（任意）", "4. Opt-in folder watcher"), padding=8)
+        watcher.pack(fill="x", pady=(0, 10))
+        ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
+        self.watch_interval_entry = ttk.Entry(watcher, textvariable=self.watch_seconds, width=7)
+        self.watch_interval_entry.pack(side="left", padx=(6, 10))
+        self.watch_start_btn = ttk.Button(watcher, text=self.t("監視を開始", "Start watching"),
+                                          command=self.start_watch)
+        self.watch_start_btn.pack(side="left")
+        self.watch_stop_btn = ttk.Button(watcher, text=self.t("監視を停止", "Stop watching"),
+                                         command=self.stop_watch)
+        self.watch_stop_btn.pack(side="left", padx=(7, 0))
+        ttk.Label(watcher, text=self.t(
+            "開始時にルールを承認します。今後届くファイルにも適用します。PCとアプリの稼働中のみ。",
+            "Approved rule also processes future files. Runs only while app and PC stay on."),
+            wraplength=360).pack(side="right", padx=(12, 0))
         ttk.Label(frame, textvariable=self.status, wraplength=820).pack(anchor="w", pady=(0, 8))
         logframe = ttk.LabelFrame(frame, text=self.t("対象ファイル・実行結果", "Preview and results"), padding=8)
         logframe.pack(fill="both", expand=True)
@@ -127,13 +146,13 @@ class FolderDesktop:
         self.log.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         ttk.Label(frame, text=self.t(
-            "安全上の制限: この画面は1回実行のみ。常時監視とバックアップ復元検証は別の操作です。",
-            "Scope: one-shot processing only. Continuous monitoring and backup verification are separate operations.",
+            "安全: 常時監視は任意・承認したルールのみ。バックアップ復元検証は別画面です。",
+            "Safety: watch mode is optional and uses only the approved rule. Backup verification is separate.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
 
     def change_language(self, _event=None) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             self.lang.set(self.displayed_language)
             return
         self.build()
@@ -146,7 +165,7 @@ class FolderDesktop:
         )
 
     def choose_folder(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         name = filedialog.askdirectory(parent=self.root)
         if name:
@@ -160,15 +179,18 @@ class FolderDesktop:
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
-        state = "disabled" if busy else "normal"
+        state = "disabled" if busy or self.watch_active else "normal"
         for entry in self.entries:
             entry.configure(state=state)
         self.action_combo.configure(state="disabled" if busy else "readonly")
         for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn):
             button.configure(state=state)
+        self.watch_interval_entry.configure(state=state)
+        self.watch_start_btn.configure(state=state)
+        self.watch_stop_btn.configure(state="normal" if self.watch_active else "disabled")
 
     def preview(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()
@@ -180,7 +202,7 @@ class FolderDesktop:
         self.start_worker("preview", config)
 
     def run_live(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()
@@ -236,10 +258,86 @@ class FolderDesktop:
                 self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
         threading.Thread(target=work, daemon=True).start()
 
+    def start_watch(self) -> None:
+        if self.busy or self.watch_active:
+            return
+        try:
+            interval = int(self.watch_seconds.get())
+            if not 10 <= interval <= 3600:
+                raise ConfigError("Watch interval must be 10–3600 seconds")
+            config = self.get_config()
+            expected = self.preview_input_snapshot
+            if self.preview_revision != revision(config) or expected is None:
+                raise ConfigError("Run a successful Dry Run on the unchanged rule first")
+        except (ValueError, OSError, ConfigError) as exc:
+            messagebox.showwarning(self.t("監視の設定", "Watcher setup"), str(exc),
+                                   parent=self.root)
+            return
+        if not messagebox.askyesno(self.t("今後のファイルも処理します", "Process future files"),
+                self.t(
+                    "このルールを今後フォルダーに届くファイルにも自動適用します。"
+                    "既存ファイルは上書きしません。アプリを閉じると停止します。開始しますか？",
+                    "Apply this approved copy/move rule to future incoming files too? "
+                    "Existing files are not overwritten. Watching stops if app exits."),
+                parent=self.root):
+            return
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.watch_stop.clear()
+        self.watch_active = True
+        self.set_busy(False)
+        self.status.set(self.t("監視を開始中…", "Starting watcher…"))
+
+        def work() -> None:
+            buffer = io.StringIO()
+            try:
+                if snapshot_inputs(config) != expected:
+                    raise ConfigError("Files changed after Dry Run; restart preview")
+                engine = Engine(config, dry_run=False)
+                while not self.watch_stop.is_set():
+                    buffer.seek(0)
+                    buffer.truncate()
+                    with contextlib.redirect_stdout(buffer):
+                        count = engine.scan_once()
+                    if count or buffer.getvalue():
+                        self.messages.put(("watch", True, f"{count} file(s)\n{buffer.getvalue()}",
+                                           "", None))
+                    if self.watch_stop.wait(interval):
+                        break
+            except Exception as exc:
+                self.messages.put(("watch", False, f"{type(exc).__name__}: {exc}", "", None))
+            finally:
+                self.messages.put(("watch_done", True, "", "", None))
+
+        self.watch_thread = threading.Thread(target=work, daemon=True)
+        self.watch_thread.start()
+
+    def stop_watch(self) -> None:
+        if self.watch_active:
+            self.watch_stop.set()
+            self.status.set(self.t("監視の終了処理中…", "Stopping after current scan…"))
+
     def poll(self) -> None:
         try:
             while True:
                 mode, ok, text, rev, sampled = self.messages.get_nowait()
+                if mode in {"watch", "watch_done"}:
+                    if text:
+                        self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
+                    if not ok:
+                        self.watch_stop.set()
+                        self.watch_active = False
+                        self.status.set(self.t("監視はエラーで停止しました", "Watcher stopped after error"))
+                        messagebox.showerror(self.t("監視エラー", "Watcher error"), text[-1500:],
+                                             parent=self.root)
+                    elif mode == "watch_done":
+                        self.watch_active = False
+                        self.status.set(self.t("監視を停止しました", "Watcher stopped"))
+                    elif ok:
+                        self.status.set(self.t("監視中（ルールによる処理が完了）",
+                                               "Watching (scan completed)"))
+                    self.set_busy(False)
+                    continue
                 self.set_busy(False)
                 self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
                 if ok and mode == "preview":
@@ -271,7 +369,7 @@ class FolderDesktop:
             self.root.after(100, self.poll)
 
     def save_config(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()
