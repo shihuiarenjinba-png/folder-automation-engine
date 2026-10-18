@@ -83,3 +83,31 @@ def snapshot_inputs(config: dict) -> tuple:
         info = path.stat()
         result.append((path.name, info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns))
     return tuple(result)
+
+
+def format_activity(raw: str, *, japanese: bool) -> str:
+    """Show file decisions in plain language; do not modify the original log."""
+    lines = []
+    for line in raw.splitlines():
+        try:
+            event = json.loads(line)
+        except (ValueError, TypeError):
+            lines.append(line)
+            continue
+        if not isinstance(event, dict) or not {"file", "action", "destination"} <= event.keys():
+            lines.append(line)
+            continue
+        source_name = Path(str(event["file"])).name
+        destination = str(event["destination"])
+        action = str(event["action"])
+        if japanese:
+            verb = "コピー予定" if action == "copy" else "移動予定"
+            if not event.get("dry_run", False):
+                verb = "コピー処理" if action == "copy" else "移動処理"
+            lines.append(f"• {source_name} → {destination}（{verb}）")
+        else:
+            verb = "would copy" if action == "copy" else "would move"
+            if not event.get("dry_run", False):
+                verb = "copy attempted" if action == "copy" else "move attempted"
+            lines.append(f"• {source_name} → {destination} ({verb})")
+    return "\n".join(lines)
