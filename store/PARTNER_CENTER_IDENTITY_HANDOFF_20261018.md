@@ -17,7 +17,7 @@
 
 ## State of the app code (not the Store registration)
 
-Guided one-shot GUI is only on the draft branch; independent backup-verifier GUI is not integrated. No verified Windows GUI CI or Store MSIX.
+The draft Folder GUI includes ordered copy/move rules (up to 10), preview-first manual execution, opt-in monitored folder processing, input stability checks, and no-overwrite. Independent backup verifier remains separate. Source has not passed private CI or real Windows acceptance; packaging is for the code operator.
 
 ## No-sales acceptance conditions
 

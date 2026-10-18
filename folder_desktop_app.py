@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine
-from folder_desktop_flow import build_config, revision, snapshot_inputs, format_activity
+from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs, format_activity
 
 
 class FolderDesktop:
@@ -31,10 +31,15 @@ class FolderDesktop:
         self.output_folder = tk.StringVar(value="processed")
         self.pattern = tk.StringVar(value="*.pdf")
         self.action = tk.StringVar(value="copy")
+        self.extra_rules: list[dict] = []
         self.status = tk.StringVar(value="")
         self.preview_revision: str | None = None
         self.preview_input_snapshot: tuple | None = None
         self.busy = False
+        self.watch_active = False
+        self.watch_stop = threading.Event()
+        self.watch_thread: threading.Thread | None = None
+        self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
         self.root.after(100, self.poll)
@@ -46,8 +51,17 @@ class FolderDesktop:
         self.displayed_language = self.lang.get()
         for child in self.root.winfo_children():
             child.destroy()
-        frame = ttk.Frame(self.root, padding=18)
-        frame.pack(fill="both", expand=True)
+        canvas = tk.Canvas(self.root, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        frame = ttk.Frame(canvas, padding=18)
+        window = canvas.create_window((0, 0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda _event: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(
+            window, width=event.width))
         heading = ttk.Frame(frame)
         heading.pack(fill="x")
         ttk.Label(
@@ -104,6 +118,11 @@ class FolderDesktop:
                 "copy keeps the original; move removes it after safe transfer. Existing files are never overwritten.",
             ), wraplength=740,
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
+        self.rules_btn = ttk.Button(
+            editor, text=self.t("複数ルールを追加・並べ替え（最大10件）",
+                                "Add and reorder rules (up to 10)"),
+            command=self.manage_rules)
+        self.rules_btn.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 1))
         buttons = ttk.LabelFrame(frame, text=self.t("② 試運転 → ③ 実行", "2. Preview → 3. Run"), padding=8)
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
@@ -118,6 +137,21 @@ class FolderDesktop:
             buttons, text=self.t("設定JSONを新規保存", "Save a new JSON config"), command=self.save_config
         )
         self.save_btn.pack(side="left")
+        watcher = ttk.LabelFrame(frame, text=self.t("④ 安全な常時監視（任意）", "4. Opt-in folder watcher"), padding=8)
+        watcher.pack(fill="x", pady=(0, 10))
+        ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
+        self.watch_interval_entry = ttk.Entry(watcher, textvariable=self.watch_seconds, width=7)
+        self.watch_interval_entry.pack(side="left", padx=(6, 10))
+        self.watch_start_btn = ttk.Button(watcher, text=self.t("監視を開始", "Start watching"),
+                                          command=self.start_watch)
+        self.watch_start_btn.pack(side="left")
+        self.watch_stop_btn = ttk.Button(watcher, text=self.t("監視を停止", "Stop watching"),
+                                         command=self.stop_watch)
+        self.watch_stop_btn.pack(side="left", padx=(7, 0))
+        ttk.Label(watcher, text=self.t(
+            "開始時にルールを承認します。今後届くファイルにも適用します。PCとアプリの稼働中のみ。",
+            "Approved rule also processes future files. Runs only while app and PC stay on."),
+            wraplength=360).pack(side="right", padx=(12, 0))
         ttk.Label(frame, textvariable=self.status, wraplength=820).pack(anchor="w", pady=(0, 8))
         logframe = ttk.LabelFrame(frame, text=self.t("対象ファイル・実行結果", "Preview and results"), padding=8)
         logframe.pack(fill="both", expand=True)
@@ -127,26 +161,141 @@ class FolderDesktop:
         self.log.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         ttk.Label(frame, text=self.t(
-            "安全上の制限: この画面は1回実行のみ。常時監視とバックアップ復元検証は別の操作です。",
-            "Scope: one-shot processing only. Continuous monitoring and backup verification are separate operations.",
+            "安全: 常時監視は任意・承認したルールのみ。バックアップ復元検証は別画面です。",
+            "Safety: watch mode is optional and uses only the approved rule. Backup verification is separate.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
 
     def change_language(self, _event=None) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             self.lang.set(self.displayed_language)
             return
         self.build()
 
     def get_config(self) -> dict:
-        return build_config(
+        return build_multi_config(
             root_dir=self.root_path.get(), input_folder=self.input_folder.get(),
             output_folder=self.output_folder.get(), filename_glob=self.pattern.get(),
-            action=self.action.get(),
+            action=self.action.get(), extra_rules=getattr(self, "extra_rules", []),
         )
 
+    def manage_rules(self) -> None:
+        """Edit additional ordered rules in a modal without touching files."""
+        if self.busy or self.watch_active:
+            return
+        draft = [dict(x) for x in self.extra_rules]
+        dialog = tk.Toplevel(self.root)
+        dialog.title(self.t("追加ルールの管理", "Manage additional rules"))
+        dialog.geometry("730x490")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        container = ttk.Frame(dialog, padding=12)
+        container.pack(fill="both", expand=True)
+        ttk.Label(container, text=self.t(
+            "最初のルールはメイン画面で設定します。ここでは第2ルール以降を追加します。"
+            "先に一致したルールが適用され、後ろのルールは実行されません。",
+            "Rule 1 is on the main screen. Add rules 2–10 here. First matching rule wins."),
+            wraplength=690).pack(anchor="w", pady=(0, 9))
+        listbox = ttk.Treeview(container, columns=("glob","destination","action"),
+                               show="headings", height=8)
+        for name, label in [
+            ("glob",self.t("対象名", "Filename pattern")),
+            ("destination",self.t("保存先", "Destination")),
+            ("action",self.t("操作", "Action")),
+        ]:
+            listbox.heading(name, text=label)
+            listbox.column(name, width=205 if name != "action" else 95)
+        listbox.pack(fill="both", expand=True)
+        editor = ttk.Frame(container)
+        editor.pack(fill="x", pady=(10, 5))
+        glob = tk.StringVar(value="*.csv")
+        dest = tk.StringVar(value="csv-files")
+        act = tk.StringVar(value="copy")
+        for idx, (label, var) in enumerate([
+            (self.t("パターン", "Pattern"), glob),
+            (self.t("移動・コピー先", "Destination"), dest),
+            (self.t("操作", "Action"), act)
+        ]):
+            ttk.Label(editor, text=label).grid(row=0, column=idx, sticky="w")
+            if idx == 2:
+                entry = ttk.Combobox(editor, textvariable=var, values=("copy","move"),
+                                     state="readonly", width=12)
+            else:
+                entry = ttk.Entry(editor, textvariable=var, width=26)
+            entry.grid(row=1, column=idx, sticky="ew", padx=(0, 10))
+            editor.columnconfigure(idx, weight=1)
+        btns = ttk.Frame(container)
+        btns.pack(fill="x", pady=6)
+
+        def refresh():
+            listbox.delete(*listbox.get_children())
+            for i, item in enumerate(draft):
+                listbox.insert("", "end", iid=str(i),
+                               values=(item["glob"], item["destination"], item["action"]))
+
+        def add():
+            proposed = {"glob": glob.get().strip(), "destination": dest.get().strip(),
+                        "action": act.get()}
+            try:
+                build_multi_config(
+                    root_dir=self.root_path.get(), input_folder=self.input_folder.get(),
+                    output_folder=self.output_folder.get(), filename_glob=self.pattern.get(),
+                    action=self.action.get(), extra_rules=draft + [proposed])
+            except (ConfigError, ValueError, OSError) as exc:
+                messagebox.showerror(self.t("ルールを確認", "Invalid rule"),
+                                     str(exc), parent=dialog)
+                return
+            draft.append(proposed)
+            refresh()
+
+        def remove():
+            selected = listbox.selection()
+            if selected:
+                draft.pop(int(selected[0]))
+                refresh()
+
+        def shift(diff):
+            selected = listbox.selection()
+            if not selected:
+                return
+            index = int(selected[0])
+            target = index + diff
+            if 0 <= target < len(draft):
+                draft[index], draft[target] = draft[target], draft[index]
+                refresh()
+                listbox.selection_set(str(target))
+
+        ttk.Button(btns, text=self.t("+ 追加", "+ Add"), command=add).pack(side="left")
+        ttk.Button(btns, text=self.t("削除", "Remove"), command=remove).pack(side="left", padx=6)
+        ttk.Button(btns, text="↑", command=lambda: shift(-1)).pack(side="left", padx=3)
+        ttk.Button(btns, text="↓", command=lambda: shift(1)).pack(side="left", padx=3)
+        ttk.Button(btns, text=self.t("キャンセル", "Cancel"), command=dialog.destroy
+                   ).pack(side="right")
+        def accept():
+            try:
+                build_multi_config(
+                    root_dir=self.root_path.get(), input_folder=self.input_folder.get(),
+                    output_folder=self.output_folder.get(), filename_glob=self.pattern.get(),
+                    action=self.action.get(), extra_rules=draft)
+            except (ConfigError, ValueError, OSError) as exc:
+                messagebox.showerror(self.t("ルールを確認", "Invalid rules"),
+                                     str(exc), parent=dialog)
+                return
+            self.extra_rules = draft
+            self.preview_revision = None
+            self.preview_input_snapshot = None
+            self.status.set(self.t(
+                f"ルール{len(draft)+1}件を設定しました。再試運転してください。",
+                f"{len(draft)+1} rule(s) configured. Run Dry Run again."))
+            dialog.destroy()
+        ttk.Button(btns, text=self.t("ルールを適用", "Apply rules"), command=accept
+                   ).pack(side="right", padx=6)
+        refresh()
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+        self.root.wait_window(dialog)
+
     def choose_folder(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         name = filedialog.askdirectory(parent=self.root)
         if name:
@@ -160,15 +309,18 @@ class FolderDesktop:
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
-        state = "disabled" if busy else "normal"
+        state = "disabled" if busy or self.watch_active else "normal"
         for entry in self.entries:
             entry.configure(state=state)
-        self.action_combo.configure(state="disabled" if busy else "readonly")
-        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn):
+        self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
+        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.rules_btn):
             button.configure(state=state)
+        self.watch_interval_entry.configure(state=state)
+        self.watch_start_btn.configure(state=state)
+        self.watch_stop_btn.configure(state="normal" if self.watch_active else "disabled")
 
     def preview(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()
@@ -180,7 +332,7 @@ class FolderDesktop:
         self.start_worker("preview", config)
 
     def run_live(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()
@@ -195,11 +347,14 @@ class FolderDesktop:
                 parent=self.root,
             )
             return
+        preview_rules = "\n".join(
+            f"{i+1}. {item['glob']} → {item['destination']} ({item['action']})"
+            for i, item in enumerate(config["rules"]))
         warning = self.t(
-            f"「{config['input_dir']}」内の {config['rules'][0]['glob']} を「{config['rules'][0]['destination']}」へ "
-            f"{'コピー' if self.action.get() == 'copy' else '移動'}します。既存ファイルは上書きしません。実行しますか？",
-            f"Files matching {config['rules'][0]['glob']} in {config['input_dir']} will be "
-            f"{'copied' if self.action.get() == 'copy' else 'moved'} to {config['rules'][0]['destination']}. Never overwrite existing files. Continue?",
+            f"次の{len(config['rules'])}ルールを順番に評価し、各ファイルの最初に一致するルールを実行します。"
+            f"\n{preview_rules}\n既存ファイルは上書きしません。よろしいですか？",
+            f"Evaluate {len(config['rules'])} rule(s) in order (first match wins):"
+            f"\n{preview_rules}\nNever overwrite existing files. Continue?",
         )
         if not messagebox.askyesno(self.t("変更を承認", "Confirm filesystem changes"), warning, parent=self.root):
             return
@@ -236,10 +391,97 @@ class FolderDesktop:
                 self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
         threading.Thread(target=work, daemon=True).start()
 
+    def start_watch(self) -> None:
+        if self.busy or self.watch_active:
+            return
+        try:
+            interval = int(self.watch_seconds.get())
+            if not 10 <= interval <= 3600:
+                raise ConfigError("Watch interval must be 10–3600 seconds")
+            config = self.get_config()
+            expected = self.preview_input_snapshot
+            if self.preview_revision != revision(config) or expected is None:
+                raise ConfigError("Run a successful Dry Run on the unchanged rule first")
+        except (ValueError, OSError, ConfigError) as exc:
+            messagebox.showwarning(self.t("監視の設定", "Watcher setup"), str(exc),
+                                   parent=self.root)
+            return
+        if not messagebox.askyesno(self.t("今後のファイルも処理します", "Process future files"),
+                self.t(
+                    "このルールを今後フォルダーに届くファイルにも自動適用します。"
+                    "既存ファイルは上書きしません。アプリを閉じると停止します。開始しますか？",
+                    "Apply this approved copy/move rule to future incoming files too? "
+                    "Existing files are not overwritten. Watching stops if app exits."),
+                parent=self.root):
+            return
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.watch_stop.clear()
+        self.watch_active = True
+        self.set_busy(False)
+        self.status.set(self.t("監視を開始中…", "Starting watcher…"))
+
+        def work() -> None:
+            buffer = io.StringIO()
+            try:
+                if snapshot_inputs(config) != expected:
+                    raise ConfigError("Files changed after Dry Run; restart preview")
+                engine = Engine(config, dry_run=False)
+                previous = expected
+                while not self.watch_stop.is_set():
+                    # Future files must be unchanged across two scans. A file
+                    # still being written may not be copied at first sight.
+                    current = snapshot_inputs(config)
+                    stable = {item[0] for item in current if item in previous}
+                    eligible = set()
+                    for name in stable:
+                        source_path = engine.input_dir / name
+                        if source_path.is_file() and not source_path.is_symlink():
+                            eligible.add(engine.signature(source_path))
+                    buffer.seek(0)
+                    buffer.truncate()
+                    with contextlib.redirect_stdout(buffer):
+                        count = engine.scan_once(eligible_signatures=eligible)
+                    if count or buffer.getvalue():
+                        self.messages.put(("watch", True, f"{count} file(s)\n{buffer.getvalue()}",
+                                           "", None))
+                    previous = current
+                    if self.watch_stop.wait(interval):
+                        break
+            except Exception as exc:
+                self.messages.put(("watch", False, f"{type(exc).__name__}: {exc}", "", None))
+            finally:
+                self.messages.put(("watch_done", True, "", "", None))
+
+        self.watch_thread = threading.Thread(target=work, daemon=True)
+        self.watch_thread.start()
+
+    def stop_watch(self) -> None:
+        if self.watch_active:
+            self.watch_stop.set()
+            self.status.set(self.t("監視の終了処理中…", "Stopping after current scan…"))
+
     def poll(self) -> None:
         try:
             while True:
                 mode, ok, text, rev, sampled = self.messages.get_nowait()
+                if mode in {"watch", "watch_done"}:
+                    if text:
+                        self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
+                    if not ok:
+                        self.watch_stop.set()
+                        self.watch_active = False
+                        self.status.set(self.t("監視はエラーで停止しました", "Watcher stopped after error"))
+                        messagebox.showerror(self.t("監視エラー", "Watcher error"), text[-1500:],
+                                             parent=self.root)
+                    elif mode == "watch_done":
+                        self.watch_active = False
+                        self.status.set(self.t("監視を停止しました", "Watcher stopped"))
+                    elif ok:
+                        self.status.set(self.t("監視中（ルールによる処理が完了）",
+                                               "Watching (scan completed)"))
+                    self.set_busy(False)
+                    continue
                 self.set_busy(False)
                 self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
                 if ok and mode == "preview":
@@ -271,7 +513,7 @@ class FolderDesktop:
             self.root.after(100, self.poll)
 
     def save_config(self) -> None:
-        if self.busy:
+        if self.busy or self.watch_active:
             return
         try:
             config = self.get_config()

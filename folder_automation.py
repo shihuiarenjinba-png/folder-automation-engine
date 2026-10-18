@@ -161,7 +161,7 @@ class Engine:
             return RuleResult.BLOCKED
         return RuleResult.HANDLED
 
-    def scan_once(self) -> int:
+    def scan_once(self, eligible_signatures: set[str] | None = None) -> int:
         if not self.input_dir.exists():
             if self.dry_run:
                 print(f"Input directory does not exist yet: {self.input_dir}")
@@ -176,6 +176,8 @@ class Engine:
             if not path.is_file():
                 continue
             sig = self.signature(path)
+            if eligible_signatures is not None and sig not in eligible_signatures:
+                continue
             if self.seen(sig):
                 continue
             processed = False

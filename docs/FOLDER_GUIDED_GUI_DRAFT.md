@@ -86,3 +86,47 @@ Owner-selected Store identity is in
 **Desktop entrypoint is `folder_desktop_app.py`, not the independent
 `backup_verifier_gui.py`.** Build operator must choose the product scope
 before packaging and must verify real GUI size/DPI and long paths on Windows.
+
+
+## Opt-in continuous folder watch (development branch, 2026-10-18)
+
+The beginner GUI now includes a watch interval (10–3600 seconds), Start Watching,
+and Stop Watching. The user must first perform a successful no-write Dry Run on
+the unchanged single copy/move rule, then explicitly confirm that this rule
+will also be applied to future incoming files. The confirmation consumes the
+preview; while watch mode is active, all editing and one-shot actions are
+disabled. The watcher uses the established SQLite file-signature engine and
+never enables overwrite by default. A changed input snapshot at startup stops
+before any write. A stop command finishes the current scan, then stops. It
+does not run while the PC/application is off.
+
+### Not yet complete / commercial HOLD
+- This is single-rule watch, not a no-code editor for multiple ordered rules.
+- New incoming files are now deferred until their file ID, length and
+  modification timestamp remain unchanged across consecutive watcher scans.
+  This reduces early partial-copy risk but does **not** guarantee no
+  simultaneous external file writes; engine stage-and-recheck protection and
+  real app producer/consumer tests remain mandatory.
+- Watched network drives, OneDrive, FAT/exFAT, permissions and hard-link
+  restrictions must be tested in a disposable directory.
+- Automated watcher consent/no-preview tests are authored in
+  tests/test_folder_gui_watcher.py, but GitHub Actions pre-step failure still
+  blocks actual CI validation.
+- Real Windows Tk/DPI/accessibility, license, signed/Store MSIX and WACK remain
+  unverified. Never merge to main or claim sale approval until all gates pass.
+
+
+### Ordered multi-rule GUI (2026-10-18 source draft)
+The desktop **Additional rules** modal adds/reorders/removes up to nine rules
+beside the primary first rule (ten total). Every extra filename glob, action
+(copy/move) and destination is validated using the same safe form validator;
+overwrite=false is mandatory and destinations remain inside the selected root.
+The first matching rule wins; a matching rule whose output already exists is
+blocked rather than falling through to a later rule. The confirmation dialog
+lists **all** effective rules, and editing the rule list revokes Dry Run approval.
+This works for both manual execution and optional folder watching; it is not
+a regex editor, recursive organizer or arbitrary script runner.
+
+New regression tests are authored in tests/test_folder_gui_flow.py. GitHub
+Actions jobs are still failing before any step, so CI PASS and clean Windows
+GUI acceptance are **not** established. Keep commercial release HOLD.

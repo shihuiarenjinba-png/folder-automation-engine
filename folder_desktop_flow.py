@@ -114,3 +114,34 @@ def format_activity(raw: str, *, japanese: bool) -> str:
                 verb = "copy attempted" if action == "copy" else "move attempted"
             lines.append(f"• {source_name} → {destination} ({verb})")
     return "\n".join(lines)
+
+
+def build_multi_config(*, root_dir: str, input_folder: str, output_folder: str,
+                       filename_glob: str, action: str,
+                       extra_rules: list[dict] | None = None) -> dict:
+    """Build ordered no-overwrite routing rules; never modify user data.
+
+    Rule 1 is the visible main form. Additional GUI rules have the same
+    safety validation and are evaluated in list order (first match wins).
+    """
+    base = build_config(root_dir=root_dir, input_folder=input_folder,
+                        output_folder=output_folder, filename_glob=filename_glob,
+                        action=action)
+    rules = list(base["rules"])
+    extras = extra_rules or []
+    if not isinstance(extras, list) or len(extras) > 9:
+        raise ConfigError("Choose at most 10 ordered folder rules")
+    seen = {str(filename_glob).casefold()}
+    for item in extras:
+        if not isinstance(item, dict):
+            raise ConfigError("Additional folder rule must be an object")
+        pattern = str(item.get("glob", "")).strip()
+        if pattern.casefold() in seen:
+            raise ConfigError("Duplicate file patterns are ambiguous; change the rule")
+        checked = build_config(root_dir=root_dir, input_folder=input_folder,
+                               output_folder=str(item.get("destination", "")),
+                               filename_glob=pattern, action=str(item.get("action", "")))
+        rules.append(checked["rules"][0])
+        seen.add(pattern.casefold())
+    base["rules"] = rules
+    return base
