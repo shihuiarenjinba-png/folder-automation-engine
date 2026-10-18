@@ -87,3 +87,19 @@ See [Windows QA Runbook](docs/WINDOWS_QA_RUNBOOK.md) for unsigned build verifica
 機能として宣伝しません。実機テストと販売パッケージ制作はコード担当へ
 引き継ぐ項目です。GitHub Actionsの最新実行がPASSしない限り、
 商用完成とは判定しません。詳細は `docs/FOLDER_GUIDED_GUI_DRAFT.md`。
+
+
+### Ordered multi-rule GUI (2026-10-18 source draft)
+The desktop **Additional rules** modal adds/reorders/removes up to nine rules
+beside the primary first rule (ten total). Every extra filename glob, action
+(copy/move) and destination is validated using the same safe form validator;
+overwrite=false is mandatory and destinations remain inside the selected root.
+The first matching rule wins; a matching rule whose output already exists is
+blocked rather than falling through to a later rule. The confirmation dialog
+lists **all** effective rules, and editing the rule list revokes Dry Run approval.
+This works for both manual execution and optional folder watching; it is not
+a regex editor, recursive organizer or arbitrary script runner.
+
+New regression tests are authored in tests/test_folder_gui_flow.py. GitHub
+Actions jobs are still failing before any step, so CI PASS and clean Windows
+GUI acceptance are **not** established. Keep commercial release HOLD.
