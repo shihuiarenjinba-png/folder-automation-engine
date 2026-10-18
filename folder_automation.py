@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from file_ops_safe import FileOperationError, copy_or_move
+
 
 class ConfigError(RuntimeError):
     pass
@@ -90,14 +92,10 @@ class Engine:
             return True
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and not overwrite:
-            print(f"SKIP destination exists: {dst}")
-            return True
-        if action == "copy":
-            shutil.copy2(src, dst)
-        else:
-            if dst.exists() and overwrite:
-                dst.unlink()
-            shutil.move(str(src), str(dst))
+            raise ConfigError(f"Destination already exists; source remains unprocessed: {dst}")
+        result = copy_or_move(src, dst, move=(action == "move"), overwrite=overwrite)
+        print(json.dumps({"event": "file_committed", "sha256": result["destination_sha256"],
+                          "moved": result["moved"]}, ensure_ascii=False))
         return True
 
     def scan_once(self) -> int:
@@ -109,6 +107,15 @@ class Engine:
 
         handled = 0
         for path in sorted(self.input_dir.iterdir()):
+            # Never follow an external file symlink or a Windows reparse-point file.
+            if path.is_symlink():
+                continue
+            try:
+                attributes = getattr(path.lstat(), "st_file_attributes", 0)
+            except OSError:
+                continue
+            if attributes & 0x400:
+                continue
             if not path.is_file():
                 continue
             sig = self.signature(path)
@@ -143,7 +150,7 @@ def main() -> int:
             time.sleep(engine.interval)
     except KeyboardInterrupt:
         return 0
-    except (OSError, json.JSONDecodeError, KeyError, ConfigError, sqlite3.Error) as exc:
+    except (OSError, json.JSONDecodeError, KeyError, ConfigError, FileOperationError, sqlite3.Error) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
