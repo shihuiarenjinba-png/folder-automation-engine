@@ -86,3 +86,29 @@ Owner-selected Store identity is in
 **Desktop entrypoint is `folder_desktop_app.py`, not the independent
 `backup_verifier_gui.py`.** Build operator must choose the product scope
 before packaging and must verify real GUI size/DPI and long paths on Windows.
+
+
+## Opt-in continuous folder watch (development branch, 2026-10-18)
+
+The beginner GUI now includes a watch interval (10–3600 seconds), Start Watching,
+and Stop Watching. The user must first perform a successful no-write Dry Run on
+the unchanged single copy/move rule, then explicitly confirm that this rule
+will also be applied to future incoming files. The confirmation consumes the
+preview; while watch mode is active, all editing and one-shot actions are
+disabled. The watcher uses the established SQLite file-signature engine and
+never enables overwrite by default. A changed input snapshot at startup stops
+before any write. A stop command finishes the current scan, then stops. It
+does not run while the PC/application is off.
+
+### Not yet complete / commercial HOLD
+- This is single-rule watch, not a no-code editor for multiple ordered rules.
+- Unannounced new files may still be in the middle of being written by another
+  application. Add a stable-file delay and stage/atomic source checks before
+  broad consumer rollout.
+- Watched network drives, OneDrive, FAT/exFAT, permissions and hard-link
+  restrictions must be tested in a disposable directory.
+- Automated watcher consent/no-preview tests are authored in
+  tests/test_folder_gui_watcher.py, but GitHub Actions pre-step failure still
+  blocks actual CI validation.
+- Real Windows Tk/DPI/accessibility, license, signed/Store MSIX and WACK remain
+  unverified. Never merge to main or claim sale approval until all gates pass.
