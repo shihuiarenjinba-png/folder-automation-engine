@@ -182,7 +182,7 @@ class FolderDesktop:
         state = "disabled" if busy or self.watch_active else "normal"
         for entry in self.entries:
             entry.configure(state=state)
-        self.action_combo.configure(state="disabled" if busy else "readonly")
+        self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
         for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn):
             button.configure(state=state)
         self.watch_interval_entry.configure(state=state)
