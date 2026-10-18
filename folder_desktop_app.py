@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine
-from folder_desktop_flow import build_config, revision, snapshot_inputs
+from folder_desktop_flow import build_config, revision, snapshot_inputs, format_activity
 
 
 class FolderDesktop:
@@ -241,7 +241,7 @@ class FolderDesktop:
             while True:
                 mode, ok, text, rev, sampled = self.messages.get_nowait()
                 self.set_busy(False)
-                self.append(text)
+                self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
                 if ok and mode == "preview":
                     try:
                         config = self.get_config()
