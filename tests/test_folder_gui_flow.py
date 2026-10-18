@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from folder_automation import ConfigError
-from folder_desktop_flow import build_config, revision, snapshot_inputs
+from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs
 from folder_desktop_app import FolderDesktop
 
 
@@ -50,6 +50,46 @@ class FolderFormTests(unittest.TestCase):
             build_config(**{**self.defaults, "root_dir": ""})
         with self.assertRaises(ConfigError):
             build_config(**{**self.defaults, "action": "delete"})
+
+    def test_multi_rule_builder_orders_rules_and_keeps_no_overwrite(self):
+        cfg = build_multi_config(**self.defaults, extra_rules=[
+            {"glob": "*.csv", "destination": "tabular", "action": "move"},
+            {"glob": "*.png", "destination": "images", "action": "copy"},
+        ])
+        self.assertEqual(len(cfg["rules"]), 3)
+        self.assertEqual([r["glob"] for r in cfg["rules"]],
+                         ["*.pdf", "*.csv", "*.png"])
+        self.assertEqual([r["destination"] for r in cfg["rules"]],
+                         ["processed", "tabular", "images"])
+        self.assertEqual([r["action"] for r in cfg["rules"]],
+                         ["copy", "move", "copy"])
+        self.assertTrue(all(r["overwrite"] is False for r in cfg["rules"]))
+        self.assertNotEqual(revision(cfg), revision(build_config(**self.defaults)))
+
+    def test_multi_rule_builder_rejects_unsafe_destination_and_duplicates(self):
+        invalid = [
+            [{"glob": "*.PDF", "destination": "docs", "action": "copy"}],
+            [{"glob": "*.csv", "destination": "../elsewhere", "action": "move"}],
+            [{"glob": "*.csv", "destination": "inbox", "action": "copy"}],
+            [{"glob": "*.csv", "destination": "tabular", "action": "delete"}],
+        ]
+        for rules in invalid:
+            with self.subTest(rules=rules), self.assertRaises(ConfigError):
+                build_multi_config(**self.defaults, extra_rules=rules)
+
+    def test_multi_rule_matches_first_rule_only(self):
+        from folder_automation import Engine
+        inbox = self.root / "inbox"
+        inbox.mkdir()
+        (inbox / "report.csv").write_text("1,2\n", encoding="utf-8")
+        cfg = build_multi_config(**self.defaults, extra_rules=[
+            {"glob": "*.csv", "destination": "one", "action": "copy"},
+            {"glob": "report.*", "destination": "two", "action": "copy"},
+        ])
+        result = Engine(cfg).scan_once()
+        self.assertEqual(result, 1)
+        self.assertTrue((self.root / "one" / "report.csv").exists())
+        self.assertFalse((self.root / "two" / "report.csv").exists())
 
     def test_revision_changes_on_any_rule_or_mode(self):
         first = build_config(**self.defaults)
