@@ -16,19 +16,19 @@ $spec = Join-Path $venv "pyinstaller-spec"
 function Assert-Code {
     if ($LASTEXITCODE -ne 0) { throw "Command failed with exit code $LASTEXITCODE" }
 }
-function Py([string[]]$Arguments) {
+function Invoke-VenvPython([string[]]$Arguments) {
     & $python @Arguments
     Assert-Code
 }
 try {
     & py -3 -m venv $venv
     Assert-Code
-    Py @("-m", "pip", "install", "--upgrade", "pip")
-    Py @("-m", "pip", "install", "pyinstaller>=6.10,<7")
-    Py @("-m", "compileall", "-q", "folder_automation.py", "folder_desktop_app.py",
+    Invoke-VenvPython @("-m", "pip", "install", "--upgrade", "pip")
+    Invoke-VenvPython @("-m", "pip", "install", "pyinstaller>=6.10,<7")
+    Invoke-VenvPython @("-m", "compileall", "-q", "folder_automation.py", "folder_desktop_app.py",
           "folder_desktop_flow.py", "tests")
-    Py @("-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v")
-    Py @("-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
+    Invoke-VenvPython @("-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v")
+    Invoke-VenvPython @("-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
           "--name", "FolderAutomationEngine", "--distpath", $OutputBase,
           "--workpath", $work, "--specpath", $spec, "folder_desktop_app.py")
     $exe = Join-Path $OutputBase "FolderAutomationEngine\FolderAutomationEngine.exe"
