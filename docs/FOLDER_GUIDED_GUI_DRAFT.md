@@ -114,3 +114,19 @@ does not run while the PC/application is off.
   blocks actual CI validation.
 - Real Windows Tk/DPI/accessibility, license, signed/Store MSIX and WACK remain
   unverified. Never merge to main or claim sale approval until all gates pass.
+
+
+### Ordered multi-rule GUI (2026-10-18 source draft)
+The desktop **Additional rules** modal adds/reorders/removes up to nine rules
+beside the primary first rule (ten total). Every extra filename glob, action
+(copy/move) and destination is validated using the same safe form validator;
+overwrite=false is mandatory and destinations remain inside the selected root.
+The first matching rule wins; a matching rule whose output already exists is
+blocked rather than falling through to a later rule. The confirmation dialog
+lists **all** effective rules, and editing the rule list revokes Dry Run approval.
+This works for both manual execution and optional folder watching; it is not
+a regex editor, recursive organizer or arbitrary script runner.
+
+New regression tests are authored in tests/test_folder_gui_flow.py. GitHub
+Actions jobs are still failing before any step, so CI PASS and clean Windows
+GUI acceptance are **not** established. Keep commercial release HOLD.
