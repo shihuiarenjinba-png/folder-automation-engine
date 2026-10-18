@@ -36,6 +36,8 @@ class FolderFormTests(unittest.TestCase):
             {"input_folder": "../private"},
             {"output_folder": r"..\\outside"},
             {"output_folder": "C:drive"},
+            {"output_folder": "COM1"},
+            {"input_folder": "lpt9"},
             {"input_folder": ".state"},
             {"filename_glob": "../*.pdf"},
         ]:
