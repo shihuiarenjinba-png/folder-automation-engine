@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine
-from folder_desktop_flow import build_config, revision
+from folder_desktop_flow import build_config, revision, snapshot_inputs
 
 
 class FolderDesktop:
@@ -33,8 +33,9 @@ class FolderDesktop:
         self.action = tk.StringVar(value="copy")
         self.status = tk.StringVar(value="")
         self.preview_revision: str | None = None
+        self.preview_input_snapshot: tuple | None = None
         self.busy = False
-        self.messages: queue.Queue[tuple[str, bool, str, str]] = queue.Queue()
+        self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
         self.root.after(100, self.poll)
 
@@ -175,6 +176,7 @@ class FolderDesktop:
             messagebox.showerror(self.t("設定エラー", "Invalid configuration"), str(exc), parent=self.root)
             return
         self.preview_revision = None
+        self.preview_input_snapshot = None
         self.start_worker("preview", config)
 
     def run_live(self) -> None:
@@ -210,35 +212,56 @@ class FolderDesktop:
         self.status.set(self.t("試運転中…", "Preview running…") if mode == "preview" else
                         self.t("ファイルを処理中…", "Processing files…"))
         rev = revision(config)
+        expected_files = self.preview_input_snapshot if mode == "live" else None
+        if mode == "live":
+            self.preview_input_snapshot = None
+
         def work() -> None:
             buf = io.StringIO()
             try:
+                actual_files = snapshot_inputs(config)
+                if mode == "live" and (expected_files is None or actual_files != expected_files):
+                    raise ConfigError(
+                        "Files changed after Dry Run. Preview again / 試運転後にファイルが変わりました。再試運転してください"
+                    )
                 with contextlib.redirect_stdout(buf):
                     count = Engine(config, dry_run=(mode == "preview")).scan_once()
-                self.messages.put((mode, True, f"{count} file(s)\n{buf.getvalue()}", rev))
+                if mode == "preview" and snapshot_inputs(config) != actual_files:
+                    raise ConfigError(
+                        "Files changed during Dry Run. Preview again / 試運転中にファイルが変わりました"
+                    )
+                self.messages.put((mode, True, f"{count} file(s)\\n{buf.getvalue()}", rev,
+                                   actual_files if mode == "preview" else None))
             except Exception as exc:
-                self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev))
+                self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
         threading.Thread(target=work, daemon=True).start()
 
     def poll(self) -> None:
         try:
             while True:
-                mode, ok, text, rev = self.messages.get_nowait()
+                mode, ok, text, rev, sampled = self.messages.get_nowait()
                 self.set_busy(False)
                 self.append(text)
                 if ok and mode == "preview":
                     try:
-                        self.preview_revision = rev if revision(self.get_config()) == rev else None
+                        config = self.get_config()
+                        unchanged = revision(config) == rev and snapshot_inputs(config) == sampled
+                        self.preview_revision = rev if unchanged else None
+                        self.preview_input_snapshot = sampled if unchanged else None
                     except (OSError, ValueError, ConfigError):
                         self.preview_revision = None
+                        self.preview_input_snapshot = None
                     self.status.set(self.t(
-                        "試運転が完了しました。設定を確認してから実行してください。",
-                        "Dry Run finished. Review results before running.",
+                        "試運転が完了しました。変更対象を確認してから実行してください。" if self.preview_revision else
+                        "対象ファイルが変わりました。再試運転してください。",
+                        "Dry Run finished. Review the files before running." if self.preview_revision else
+                        "Input files changed; please preview again.",
                     ))
                 elif ok:
                     self.status.set(self.t("実行が完了しました。", "Execution completed."))
                 else:
                     self.preview_revision = None
+                    self.preview_input_snapshot = None
                     self.status.set(self.t("失敗しました。元データと保存先を確認してください。",
                                            "Operation failed. Check the source and destination."))
                     messagebox.showerror(self.t("実行エラー", "Operation error"), text[-1500:], parent=self.root)
