@@ -67,3 +67,7 @@ GitHub Actionsは `.github/workflows/windows-validation.yml` から**手動実�
 ## Windows QA evidence and manual acceptance (2026-10-13)
 
 See [Windows QA Runbook](docs/WINDOWS_QA_RUNBOOK.md) for unsigned build verification, manual checks and local evidence. **This is not a sales release.**
+
+## Folder rules editor (improvement branch)
+
+Run `python folder_gui.py` for local rule creation, JSON save/load, Dry Run preview, one-time copy/move, and monitoring **while the window remains open**. Destructive move operations require an explicit confirmation and do not overwrite by default. A new `min_stable_seconds` configuration value delays eligible actions after a file's last modification (default 3 seconds). This is a basic safety delay rather than a guarantee that all writers have closed the file. Run `python -m unittest discover -s tests -v` and validate Windows ACL, locked files, symlinks, junctions and network/OneDrive folders. Compare the more extensive `feat/folder-gui-continuous-watch-20261018` GUI and file-stability implementation before choosing a release branch. Store submission: **HOLD**.
