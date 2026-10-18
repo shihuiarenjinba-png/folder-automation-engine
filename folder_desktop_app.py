@@ -230,7 +230,7 @@ class FolderDesktop:
                     raise ConfigError(
                         "Files changed during Dry Run. Preview again / 試運転中にファイルが変わりました"
                     )
-                self.messages.put((mode, True, f"{count} file(s)\\n{buf.getvalue()}", rev,
+                self.messages.put((mode, True, f"{count} file(s)\n{buf.getvalue()}", rev,
                                    actual_files if mode == "preview" else None))
             except Exception as exc:
                 self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
