@@ -109,6 +109,29 @@ class FolderAutomationSafetyTests(unittest.TestCase):
             finally:
                 external.unlink(missing_ok=True)
 
+    def test_windows_reparse_flag_is_skipped_even_if_not_symlink(self) -> None:
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "inbox").mkdir()
+            src = root / "inbox" / "a.txt"
+            src.write_text("preserve source", encoding="utf-8")
+            engine = make_engine(root)
+            original_lstat = Path.lstat
+
+            def pretend_reparse(path, *args, **kwargs):
+                stat = original_lstat(path, *args, **kwargs)
+                if Path(path) == src:
+                    return SimpleNamespace(st_mode=stat.st_mode,
+                                           st_file_attributes=0x400)
+                return stat
+
+            with patch.object(Path, "lstat", new=pretend_reparse):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(engine.scan_once(), 0)
+            self.assertTrue(src.exists())
+            self.assertFalse((root / "processed" / "a.txt").exists())
+
     def test_destination_symlink_is_rejected_without_overwrite(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
