@@ -24,6 +24,7 @@ class Engine:
         self.root = Path(config.get("root_dir", ".")).expanduser().resolve()
         self.input_dir = self._path(config.get("input_dir", "inbox"))
         self.interval = max(float(config.get("poll_seconds", 5)), 1.0)
+        self.min_stable_seconds = max(float(config.get("min_stable_seconds", 3)), 0.0)
         self.rules = config.get("rules", [])
         if not isinstance(self.rules, list) or not self.rules:
             raise ConfigError("rules must be a non-empty list")
@@ -117,6 +118,9 @@ class Engine:
             if attributes & 0x400:
                 continue
             if not path.is_file():
+                continue
+            # Avoid consuming a file while another application is still writing it.
+            if time.time() - path.stat().st_mtime < self.min_stable_seconds:
                 continue
             sig = self.signature(path)
             if self.seen(sig):
