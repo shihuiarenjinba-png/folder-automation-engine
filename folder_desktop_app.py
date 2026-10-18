@@ -312,7 +312,7 @@ def self_test() -> int:
             handled = Engine(config, dry_run=True).scan_once()
         if handled != 1 or (root / "processed").exists() or (root / ".state").exists():
             raise RuntimeError("Packaged Dry Run did not preserve local files")
-    print("FOLDER_DESKTOP_SELF_TEST_OK")
+    # --windowed PyInstaller executables may have sys.stdout=None.
     return 0
 
 
