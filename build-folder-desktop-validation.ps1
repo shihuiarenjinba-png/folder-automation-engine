@@ -1,6 +1,9 @@
 # Build the actual Folder Automation Engine GUI, not BackupRestoreVerifier.
 # Technical validation only. No Store submission, signing or release.
-param([string]$OutputBase = "")
+param(
+    [string]$OutputBase = "",
+    [string]$BasePythonPath = ""
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = $PSScriptRoot
@@ -21,7 +24,14 @@ function Invoke-VenvPython([string[]]$Arguments) {
     Assert-Code
 }
 try {
-    & py -3 -m venv $venv
+    if ($BasePythonPath) {
+        if (-not (Test-Path -LiteralPath $BasePythonPath -PathType Leaf)) {
+            throw "Base Python executable not found: $BasePythonPath"
+        }
+        & $BasePythonPath -m venv $venv
+    } else {
+        & py -3 -m venv $venv
+    }
     Assert-Code
     Invoke-VenvPython @("-m", "pip", "install", "--upgrade", "pip")
     Invoke-VenvPython @("-m", "pip", "install", "pyinstaller>=6.10,<7")
@@ -60,3 +70,4 @@ try {
         Remove-Item -LiteralPath $venv -Force -Recurse
     }
 }
+
