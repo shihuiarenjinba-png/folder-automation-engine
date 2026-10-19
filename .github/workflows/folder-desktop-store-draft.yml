@@ -1,0 +1,47 @@
+name: Folder desktop and unsigned Store draft
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build Folder desktop validation payload
+        shell: powershell
+        run: |
+          $basePython = (Get-Command python).Source
+          ./build-folder-desktop-validation.ps1 -BasePythonPath $basePython
+      - name: Build and verify unsigned Store MSIX draft
+        shell: powershell
+        run: |
+          $candidate = Get-ChildItem -Path dist-folder-validation -Directory | Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.FullName 'FolderAutomationEngine\FolderAutomationEngine.exe')
+          } | Select-Object -First 1
+          if (-not $candidate) { throw 'FolderAutomationEngine validation payload not found' }
+          ./store/build_msix_draft.ps1 `
+            -PayloadDirectory (Join-Path $candidate.FullName 'FolderAutomationEngine') `
+            -OutputDirectory ("store-out-" + $env:GITHUB_RUN_ID)
+      - name: Upload Folder desktop validation payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: FolderAutomationEngine-Windows
+          path: dist-folder-validation/**
+      - name: Upload unsigned non-release Store MSIX draft
+        uses: actions/upload-artifact@v4
+        with:
+          name: FolderAutomationEngine-Store-MSIX-UNSIGNED-DRAFT
+          path: |
+            store-out-*/*.msix
+            store-out-*/msix_validation.json
+            store-out-*/msix.sha256.txt
+
