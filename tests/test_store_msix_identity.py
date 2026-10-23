@@ -38,6 +38,11 @@ class StoreIdentityDraftTests(unittest.TestCase):
         self.assertIn("build-folder-desktop-validation.ps1",workflow)
         self.assertIn("store/build_msix_draft.ps1",workflow)
         self.assertIn("FolderAutomationEngine-Store-MSIX-UNSIGNED-DRAFT",workflow)
+        self.assertIn("source_commit=$sourceCommit", builder)
+        self.assertIn("git -C $repoRoot rev-parse HEAD", builder)
+        build_script=(ROOT/"build-folder-desktop-validation.ps1").read_text(encoding="utf-8")
+        self.assertIn("source_commit = $sourceCommit", build_script)
+        self.assertIn("git -C $repo rev-parse HEAD", build_script)
 
 
 if __name__ == "__main__":
