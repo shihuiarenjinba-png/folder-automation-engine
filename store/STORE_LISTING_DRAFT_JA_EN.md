@@ -10,7 +10,7 @@
 条件に合うファイルを、指定フォルダーへ安全にコピー・移動するオフラインWindowsアプリ。実行前の試運転に対応。
 
 **長い説明:**
-Folder Automation Engineは、指定したフォルダーに置かれたファイルを、ファイル名の条件（例：*.pdf）に従って別のフォルダーへコピー・移動するWindows用ツールです。はじめにメインフォルダー・入力先・保存先・条件を選び、試運転で対象を確認してから実行します。新しい初心者向けGUIは1回実行方式で、既存ファイルは上書きしません。常時監視はエンジン側の別操作です。バックアップ復元検証GUIは独立機能で、この製品の整理画面に統合されていません。
+Folder Automation Engineは、指定したフォルダーに置かれたファイルを、ファイル名の条件（例：*.pdf）に従って別のフォルダーへコピー・移動するWindows用ツールです。はじめにメインフォルダー・入力先・保存先・条件を選び、試運転で対象を確認してから実行します。新しい初心者向けGUIは、試運転後の1回実行に加えて、同じ承認済みルールを使う任意の常時監視を開始・停止できます。常時監視はアプリを閉じると停止し、既存ファイルは上書きしません。バックアップ復元検証GUIは独立機能で、この製品の整理画面に統合されていません。
 
 **動作条件・注意:** Real folder permissions, cloud-synced folders and storage media need QA.
 Microsoft Store版の正式な対応OS、アイコン、販売価格、データ宣言、プライバシー/サポートURLは未承認です。第三者の情報・権利・利用規約に従って使用してください。
@@ -21,7 +21,7 @@ Microsoft Store版の正式な対応OS、アイコン、販売価格、データ
 Copy or move local files by filename rules with a no-write preview and no-overwrite default.
 
 **Long description:**
-Folder Automation Engine organizes local files using deterministic filename rules. Choose a main directory, input and output subfolders and a filename pattern; inspect a no-write preview; then explicitly approve a one-time copy or move. The beginner GUI defaults to copy and does not overwrite existing files. Continuous monitoring is a separate engine workflow, and the independent backup verification interface is not part of the beginner organizer GUI.
+Folder Automation Engine organizes local files using deterministic filename rules. Choose a main directory, input and output subfolders and a filename pattern; inspect a no-write preview; then explicitly approve a one-time copy or move. The beginner GUI defaults to copy and does not overwrite existing files. After a successful preview, users can optionally start or stop folder watching with the same approved rules; watching stops when the app exits. The independent backup verification interface is not part of the beginner organizer GUI.
 
 **Requirements and limits:** Real folder permissions, cloud-synced folders and storage media need QA.
 
