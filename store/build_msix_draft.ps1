@@ -17,6 +17,7 @@ if ($identity.store_id -cne "9P99MJX1R4V6" -or
 }
 if (-not $Version) { $Version = [string]$identity.initial_msix_version }
 if ($Version -notmatch '^\d+\.\d+\.\d+\.0$') { throw "Expected a four-part MSIX version ending in .0" }
+if ([int]($Version.Split('.')[0]) -lt 1) { throw "Store MSIX version major component must be >= 1; no version guessing is permitted." }
 foreach ($v in $Version.Split('.')) { [int]$n = 0; if (-not [int]::TryParse($v,[ref]$n) -or $n -gt 65535) { throw "Version component out of range" } }
 $payload = if ([IO.Path]::IsPathRooted($PayloadDirectory)) { $PayloadDirectory } else { Join-Path $repoRoot $PayloadDirectory }
 if (-not (Test-Path -LiteralPath $payload -PathType Container)) { throw "Missing payload directory: $payload" }
@@ -69,7 +70,7 @@ Assert-Manifest (Join-Path $unpack "AppxManifest.xml")
 $sourceSha=(Get-FileHash -Algorithm SHA256 -LiteralPath $sourceExe).Hash.ToLowerInvariant(); $unpackedSha=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $unpack "FolderAutomationEngine.exe")).Hash.ToLowerInvariant()
 if ($sourceSha -cne $unpackedSha -or -not (Test-Path -LiteralPath (Join-Path $unpack "_internal") -PathType Container)) { throw "MSIX onedir payload changed after pack/unpack" }
 $packageSha=(Get-FileHash -Algorithm SHA256 -LiteralPath $msix).Hash.ToLowerInvariant()
-$report=[ordered]@{ store_id=[string]$identity.store_id; identity_name=[string]$identity.package_identity_name; identity_publisher=[string]$identity.publisher; msix_file=$msixName; msix_version=$Version; source_exe_sha256=$sourceSha; unpacked_exe_sha256=$unpackedSha; msix_sha256=$packageSha; onedir_runtime_verified=$true; manifest_identity_verified=$true; makeappx_pack_unpack="PASS"; signed=$false; approved_logo=$false; symlink_safety_tests_complete=$false; manual_windows_acceptance=$false; store_submission_approved=$false; sale_approved=$false }
+$report=[ordered]@{ msix_package_version_status=[string]$identity.msix_package_version_status; previous_store_accepted_version=$identity.previous_store_accepted_version; store_version_history_verified=[bool]$identity.store_version_history_verified; store_submission_allowed=[bool]$identity.submission_allowed; store_id=[string]$identity.store_id; identity_name=[string]$identity.package_identity_name; identity_publisher=[string]$identity.publisher; msix_file=$msixName; msix_version=$Version; source_exe_sha256=$sourceSha; unpacked_exe_sha256=$unpackedSha; msix_sha256=$packageSha; onedir_runtime_verified=$true; manifest_identity_verified=$true; makeappx_pack_unpack="PASS"; signed=$false; approved_logo=$false; symlink_safety_tests_complete=$false; manual_windows_acceptance=$false; store_submission_approved=$false; sale_approved=$false }
 $report | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $out "msix_validation.json") -Encoding UTF8
 "$packageSha  $msixName" | Set-Content -LiteralPath (Join-Path $out "msix.sha256.txt") -Encoding ASCII
 Write-Host "Validated UNSIGNED draft MSIX: $msix"; Write-Warning "Technical review only: temporary icons, unsigned, three symlink tests remain unverified, not approved for sale."
