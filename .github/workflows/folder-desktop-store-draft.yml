@@ -39,6 +39,7 @@ jobs:
         with:
           name: FolderAutomationEngine-Windows
           path: dist-folder-validation/**
+          if-no-files-found: error
       - name: Upload unsigned non-release Store MSIX draft
         uses: actions/upload-artifact@v4
         with:
@@ -47,4 +48,5 @@ jobs:
             store-out-*/*.msix
             store-out-*/msix_validation.json
             store-out-*/msix.sha256.txt
+          if-no-files-found: error
 
