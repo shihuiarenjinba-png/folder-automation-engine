@@ -156,14 +156,20 @@ class FolderAutomationSafetyTests(unittest.TestCase):
             engine = make_engine(root, action="copy")
             original_link = __import__("os").link
 
+            link_attempts = []
+
             def concurrent_writer(staged, destination):
-                if Path(destination) == target:
-                    target.write_text("competing writer", encoding="utf-8")
+                # Windows may canonicalize a temporary directory differently;
+                # always inject the destination race at the link operation.
+                link_attempts.append(Path(destination))
+                target.write_text("competing writer", encoding="utf-8")
                 return original_link(staged, destination)
 
             with patch("folder_automation.os.link", side_effect=concurrent_writer):
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(engine.scan_once(), 0)
+            self.assertEqual(len(link_attempts), 1)
+            self.assertEqual(link_attempts[0].resolve(), target.resolve())
             self.assertEqual(target.read_text(encoding="utf-8"), "competing writer")
             self.assertEqual(source.read_text(encoding="utf-8"), "original source")
             self.assertEqual(list((root / "processed").glob(".folder-automation-*")), [])
