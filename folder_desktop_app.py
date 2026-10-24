@@ -88,15 +88,15 @@ class FolderDesktop:
         ttk.Label(editor, text=self.t("基準フォルダー", "Main folder")).grid(
             row=0, column=0, sticky="w", padx=(0, 8), pady=5
         )
-        self.root_entry = ttk.Entry(editor, textvariable=self.root_path)
+        self.root_entry = ttk.Entry(editor, textvariable=self.root_path, state="readonly")
         self.root_entry.grid(row=0, column=1, sticky="ew", pady=5)
         self.choose_btn = ttk.Button(
             editor, text=self.t("フォルダーを選ぶ", "Choose folder"), command=self.choose_folder
         )
         self.choose_btn.grid(row=0, column=2, padx=(8, 0))
         rows = [
-            (1, "読み込み先の名前（基準内）", "Input folder name (inside main)", self.input_folder),
-            (2, "保存先の名前（基準内）", "Output folder name (inside main)", self.output_folder),
+            (1, "整理するフォルダー", "Source folder", self.input_folder),
+            (2, "コピー・移動先フォルダー", "Destination folder", self.output_folder),
             (3, "対象ファイル（例 *.pdf）", "Filename pattern (e.g. *.pdf)", self.pattern),
         ]
         self.entries: list[ttk.Entry] = [self.root_entry]
@@ -105,24 +105,64 @@ class FolderDesktop:
                 row=row, column=0, sticky="w", padx=(0, 8), pady=5
             )
             entry = ttk.Entry(editor, textvariable=variable)
-            entry.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+            entry.grid(row=row, column=1, columnspan=(2 if row == 3 else 1),
+                       sticky="ew", pady=5)
             self.entries.append(entry)
-        ttk.Label(editor, text=self.t("操作", "Action")).grid(row=4, column=0, sticky="w", pady=5)
+            if row == 1:
+                self.source_choose_btn = ttk.Button(
+                    editor, text=self.t("選ぶ", "Browse"),
+                    command=lambda: self._choose_child_folder(for_input=True))
+                self.source_choose_btn.grid(row=row, column=2, padx=(8, 0))
+            elif row == 2:
+                self.destination_choose_btn = ttk.Button(
+                    editor, text=self.t("選ぶ", "Browse"),
+                    command=lambda: self._choose_child_folder(for_input=False))
+                self.destination_choose_btn.grid(row=row, column=2, padx=(8, 0))
+        ttk.Label(editor, text=self.t("かんたん設定（例）", "Quick examples")).grid(
+            row=4, column=0, sticky="w", pady=5)
+        presets = ttk.Frame(editor)
+        presets.grid(row=4, column=1, columnspan=2, sticky="w", pady=5)
+        self.preset_buttons = []
+        for ja, en, glob in (
+            ("PDF", "PDF", "*.pdf"),
+            ("Word", "Word", "*.docx"),
+            ("Excel", "Excel", "*.xlsx"),
+            ("ZIP", "ZIP", "*.zip"),
+            ("JPG", "JPG", "*.jpg"),
+            ("PNG", "PNG", "*.png"),
+        ):
+            button = ttk.Button(
+                presets, text=self.t(ja, en), width=7,
+                command=lambda value=glob: self.set_quick_pattern(value),
+            )
+            button.pack(side="left", padx=(0, 4))
+            self.preset_buttons.append(button)
+        ttk.Label(editor, text=self.t("上の例以外も対象ファイル欄で指定できます。",
+                                     "Other file types can be entered in the filename field."),
+                  wraplength=620).grid(row=5, column=0, columnspan=3, sticky="w")
+        ttk.Label(editor, text=self.t("操作", "Action")).grid(row=6, column=0, sticky="w", pady=5)
+        self.action_display = tk.StringVar(value=self.t(
+            "コピー（元を残す）" if self.action.get() == "copy" else "移動（元から移す）",
+            "Copy (keep original)" if self.action.get() == "copy" else "Move (remove original)"))
         self.action_combo = ttk.Combobox(
-            editor, textvariable=self.action, values=("copy", "move"), state="readonly", width=16
+            editor, textvariable=self.action_display,
+            values=(self.t("コピー（元を残す）", "Copy (keep original)"),
+                    self.t("移動（元から移す）", "Move (remove original)")),
+            state="readonly", width=25
         )
-        self.action_combo.grid(row=4, column=1, sticky="w", pady=5)
+        self.action_combo.bind("<<ComboboxSelected>>", self.change_action)
+        self.action_combo.grid(row=6, column=1, sticky="w", pady=5)
         ttk.Label(
             editor, text=self.t(
-                "copy = 元ファイルを残す / move = 元ファイルを移す。既存ファイルへの上書きは禁止です。",
-                "copy keeps the original; move removes it after safe transfer. Existing files are never overwritten.",
+                "コピーは元ファイルを残し、移動は元の場所から取り除きます。既存ファイルは上書きしません。",
+                "Copy keeps the source. Move removes it after safe transfer. Existing files are never overwritten.",
             ), wraplength=740,
-        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
+        ).grid(row=7, column=0, columnspan=3, sticky="w", pady=(5, 0))
         self.rules_btn = ttk.Button(
             editor, text=self.t("複数ルールを追加・並べ替え（最大10件）",
                                 "Add and reorder rules (up to 10)"),
             command=self.manage_rules)
-        self.rules_btn.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 1))
+        self.rules_btn.grid(row=8, column=0, columnspan=3, sticky="w", pady=(6, 1))
         buttons = ttk.LabelFrame(frame, text=self.t("② 試運転 → ③ 実行", "2. Preview → 3. Run"), padding=8)
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
@@ -165,6 +205,35 @@ class FolderDesktop:
             "Safety: watch mode is optional and uses only the approved rule. Backup verification is separate.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
+
+    def set_quick_pattern(self, value: str) -> None:
+        """Choose a single explicit file pattern without hiding custom rules."""
+        if self.busy or self.watch_active:
+            return
+        self.pattern.set(value)
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.status.set(self.t("条件を変更しました。もう一度試運転してください。",
+                               "Rule changed. Preview again before running."))
+
+    def change_action(self, _event=None) -> None:
+        """Convert beginner wording into the unchanged safe engine action."""
+        if self.busy or self.watch_active:
+            return
+        choices = {
+            self.t("コピー（元を残す）", "Copy (keep original)"): "copy",
+            self.t("移動（元から移す）", "Move (remove original)"): "move",
+        }
+        new_action = choices.get(self.action_display.get())
+        if new_action is None:
+            # Never turn unknown display text into a destructive move.
+            return
+        if new_action != self.action.get():
+            self.action.set(new_action)
+            self.preview_revision = None
+            self.preview_input_snapshot = None
+            self.status.set(self.t("操作を変更しました。もう一度試運転してください。",
+                                   "Action changed. Preview again before running."))
 
     def change_language(self, _event=None) -> None:
         if self.busy or self.watch_active:
@@ -300,6 +369,53 @@ class FolderDesktop:
         name = filedialog.askdirectory(parent=self.root)
         if name:
             self.root_path.set(name)
+            self.preview_revision = None
+            self.preview_input_snapshot = None
+            self.status.set(self.t("フォルダーを変更しました。もう一度試運転してください。",
+                                   "Folder changed. Preview again before running."))
+
+    def _choose_child_folder(self, *, for_input: bool) -> None:
+        """Use the native folder picker; reject paths outside the chosen parent."""
+        if self.busy or self.watch_active:
+            return
+        root_text = self.root_path.get().strip()
+        if not root_text:
+            messagebox.showerror(
+                self.t("フォルダーを選んでください", "Choose main folder"),
+                self.t("最初に基準フォルダーを選択してください。",
+                       "First choose the main folder."), parent=self.root)
+            return
+        root = Path(root_text).expanduser().resolve()
+        chosen = filedialog.askdirectory(parent=self.root, initialdir=str(root))
+        if not chosen:
+            return
+        candidate = Path(chosen).expanduser()
+        try:
+            # Do not normalize a selected symbolic link into an unrelated path.
+            if candidate.is_symlink() or not candidate.is_dir():
+                raise ConfigError("Select an existing, non-link folder")
+            resolved = candidate.resolve()
+            if resolved.parent != root or not resolved.name:
+                raise ConfigError("Choose a folder directly inside the main folder")
+            name = resolved.name
+            if name.lower() in (".state", "con", "prn", "aux", "nul"):
+                raise ConfigError("Reserved folder name")
+            if for_input:
+                if name.casefold() == self.output_folder.get().casefold():
+                    raise ConfigError("Source and destination must be different")
+                self.input_folder.set(name)
+            else:
+                if name.casefold() == self.input_folder.get().casefold():
+                    raise ConfigError("Source and destination must be different")
+                self.output_folder.set(name)
+        except (OSError, ConfigError) as exc:
+            messagebox.showerror(self.t("フォルダーを確認", "Check folder"),
+                                 str(exc), parent=self.root)
+            return
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.status.set(self.t("フォルダーを変更しました。もう一度試運転してください。",
+                               "Folder changed. Preview again before running."))
 
     def append(self, data: str) -> None:
         self.log.configure(state="normal")
@@ -311,7 +427,13 @@ class FolderDesktop:
         self.busy = busy
         state = "disabled" if busy or self.watch_active else "normal"
         for entry in self.entries:
-            entry.configure(state=state)
+            # Folder location is always chosen with the Windows folder picker.
+            entry.configure(state="disabled" if busy or self.watch_active else
+                            ("readonly" if entry is self.root_entry else "normal"))
+        for preset in getattr(self, "preset_buttons", []):
+            preset.configure(state=state)
+        for picker in (self.source_choose_btn, self.destination_choose_btn):
+            picker.configure(state=state)
         self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
         for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.rules_btn):
             button.configure(state=state)

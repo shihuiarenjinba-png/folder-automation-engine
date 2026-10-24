@@ -120,10 +120,34 @@ class Engine:
         finally:
             tmp.unlink(missing_ok=True)
 
+    # Browser download staging suffixes: never treat an unfinished transfer
+    # (or its same-name final file while a transfer exists) as a complete file.
+    # Only unambiguous download suffixes are blocked; ordinary .tmp documents
+    # remain eligible when explicitly requested.
+    DOWNLOAD_PART_SUFFIXES = (".crdownload", ".part", ".partial", ".download")
+
+    @classmethod
+    def unfinished_download(cls, src: Path) -> bool:
+        name = src.name.casefold()
+        if any(name.endswith(suffix) for suffix in cls.DOWNLOAD_PART_SUFFIXES):
+            return True
+        # Browser may expose the final filename before transfer completion.
+        # Reject a concurrent "report.pdf.crdownload" / "report.pdf.part".
+        pending = {f"{name}{suffix}" for suffix in cls.DOWNLOAD_PART_SUFFIXES}
+        try:
+            return any(item.name.casefold() in pending
+                       for item in src.parent.iterdir())
+        except OSError as exc:
+            # Cannot inspect transfer status => do not modify source.
+            raise ConfigError(f"Unable to inspect download status for {src}") from exc
+
     def apply_rule(self, src: Path, rule: dict[str, Any]) -> RuleResult:
         pattern = str(rule.get("glob", "*"))
         if not fnmatch.fnmatch(src.name, pattern):
             return RuleResult.NO_MATCH
+        if self.unfinished_download(src):
+            print(f"SKIP unfinished download: {src}")
+            return RuleResult.BLOCKED
 
         action = str(rule.get("action", "")).lower()
         if action not in {"copy", "move"}:
