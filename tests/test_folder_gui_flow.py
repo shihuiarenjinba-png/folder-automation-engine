@@ -194,7 +194,7 @@ class FolderGuiGateTests(unittest.TestCase):
         app.set_busy = Mock()
         with patch("folder_desktop_app.threading.Thread",
                    side_effect=lambda target, daemon: SimpleNamespace(start=target)):
-            app.start_worker("live", self.cfg)
+            FolderDesktop.start_worker(app, "live", self.cfg)
         event = app.messages.get_nowait()
         self.assertFalse(event[1])
         self.assertIn("Files changed", event[2])
@@ -215,3 +215,4 @@ class FolderGuiGateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

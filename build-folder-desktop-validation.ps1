@@ -1,9 +1,16 @@
 # Build the actual Folder Automation Engine GUI, not BackupRestoreVerifier.
 # Technical validation only. No Store submission, signing or release.
-param([string]$OutputBase = "")
+param(
+    [string]$OutputBase = "",
+    [string]$BasePythonPath = ""
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = $PSScriptRoot
+$sourceCommit = (& git -C $repo rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'Unable to resolve exact source commit for validation build.'
+}
 $stamp = [guid]::NewGuid().ToString("N")
 if (-not $OutputBase) {
     $OutputBase = Join-Path $repo ("dist-folder-validation\FolderAutomationEngine-" + $stamp)
@@ -21,7 +28,14 @@ function Invoke-VenvPython([string[]]$Arguments) {
     Assert-Code
 }
 try {
-    & py -3 -m venv $venv
+    if ($BasePythonPath) {
+        if (-not (Test-Path -LiteralPath $BasePythonPath -PathType Leaf)) {
+            throw "Base Python executable not found: $BasePythonPath"
+        }
+        & $BasePythonPath -m venv $venv
+    } else {
+        & py -3 -m venv $venv
+    }
     Assert-Code
     Invoke-VenvPython @("-m", "pip", "install", "--upgrade", "pip")
     Invoke-VenvPython @("-m", "pip", "install", "pyinstaller>=6.10,<7")
@@ -41,6 +55,7 @@ try {
     $report = [ordered]@{
         expected_product = "Folder Automation Engine"
         packaged_entrypoint = "folder_desktop_app.py"
+        source_commit = $sourceCommit
         exe_name = "FolderAutomationEngine.exe"
         exe_sha256 = $hash
         packaged_engine_selftest = "PASS"
