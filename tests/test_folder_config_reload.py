@@ -1,5 +1,4 @@
 """Pure config and no-window restore tests for the standard Folder GUI."""
-import copy
 import json
 import tempfile
 import unittest
@@ -63,7 +62,7 @@ class SafeSavedConfigTests(unittest.TestCase):
         app.status = Mock()
         app.preview_revision = "old-revision"
         app.preview_input_snapshot = ("old-file",)
-        with patch("folder_desktop_app.filedialog.askopenfilename", return_value=str(path)), \\
+        with patch("folder_desktop_app.filedialog.askopenfilename", return_value=str(path)), \
              patch("folder_desktop_app.Engine") as engine:
             app.load_config()
         app.root_path.set.assert_called_once_with(str(self.root.resolve()))
@@ -89,7 +88,7 @@ class SafeSavedConfigTests(unittest.TestCase):
         app.status = Mock()
         app.preview_revision = "good"
         app.preview_input_snapshot = ("kept",)
-        with patch("folder_desktop_app.filedialog.askopenfilename", return_value=str(path)), \\
+        with patch("folder_desktop_app.filedialog.askopenfilename", return_value=str(path)), \
              patch("folder_desktop_app.messagebox.showerror") as error:
             app.load_config()
         app.root_path.set.assert_not_called()
