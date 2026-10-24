@@ -16,6 +16,26 @@ from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine
 from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs, format_activity
+from ui_preferences import load_preferences, save_preferences
+
+_GUI_PREF_PRODUCT = "FolderAutomationEngine"
+_GUI_PREF_FIELDS = ("locale",)
+_GUI_LANGUAGES = ("日本語", "English")
+
+
+def load_gui_language() -> str:
+    """Read only the allowlisted locale, without changing a damaged settings file."""
+    try:
+        value = load_preferences(_GUI_PREF_PRODUCT, _GUI_PREF_FIELDS).get("locale", "日本語")
+    except (OSError, ValueError):
+        return "日本語"
+    return value if value in _GUI_LANGUAGES else "日本語"
+
+
+def save_gui_language(language: str) -> None:
+    if language not in _GUI_LANGUAGES:
+        raise ValueError("Unsupported GUI language")
+    save_preferences(_GUI_PREF_PRODUCT, {"locale": language}, _GUI_PREF_FIELDS)
 
 
 class FolderDesktop:
@@ -24,8 +44,8 @@ class FolderDesktop:
         self.root.title("Folder Automation Engine")
         self.root.geometry("900x690")
         self.root.minsize(720, 570)
-        self.lang = tk.StringVar(value="日本語")
-        self.displayed_language = "日本語"
+        self.lang = tk.StringVar(value=load_gui_language())
+        self.displayed_language = self.lang.get()
         self.root_path = tk.StringVar()
         self.input_folder = tk.StringVar(value="inbox")
         self.output_folder = tk.StringVar(value="processed")
@@ -170,6 +190,20 @@ class FolderDesktop:
         if self.busy or self.watch_active:
             self.lang.set(self.displayed_language)
             return
+        language = self.lang.get()
+        if language not in _GUI_LANGUAGES:
+            self.lang.set(self.displayed_language)
+            return
+        if language != self.displayed_language:
+            try:
+                save_gui_language(language)
+            except (OSError, ValueError) as exc:
+                self.lang.set(self.displayed_language)
+                messagebox.showerror(
+                    self.t("言語の保存に失敗", "Could not save language preference"),
+                    str(exc), parent=self.root,
+                )
+                return
         self.build()
 
     def get_config(self) -> dict:
