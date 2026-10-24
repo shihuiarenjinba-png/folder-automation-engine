@@ -67,3 +67,39 @@ GitHub Actionsは `.github/workflows/windows-validation.yml` から**手動実�
 ## Windows QA evidence and manual acceptance (2026-10-13)
 
 See [Windows QA Runbook](docs/WINDOWS_QA_RUNBOOK.md) for unsigned build verification, manual checks and local evidence. **This is not a sales release.**
+
+## 初回画面から分かる商品内容 / Guided GUI (draft 2026-10-18)
+
+`python folder_desktop_app.py` で、初心者向けのファイル整理画面を開けます。
+画面冒頭に「この商品は条件に合ったローカルファイルをコピー・移動する」と明示し、
+**基準フォルダーを選択 → 入力先・出力先・条件を指定 → Dry Run → 確認して1回実行**
+という順序で操作できます。初期設定は `copy`、**既存ファイルは上書き禁止**です。
+
+試運転時の入力ファイル一覧・ファイルサイズ・更新時刻のスナップショットを
+本実行直前に再確認します。途中で増減・変更があれば、予期しないファイルの
+処理を避けるため、再度Dry Runが必要です。厳密な同時書き込みトランザクション
+ではないため、エンジン側の排他的な保存処理も併用します。
+
+新しく保存する設定JSONも上書きせず、既存の顧客データを変更しません。
+
+**商品上の区別:** この開発ブランチでは単発実行に加え、明示承認制の常時監視モードも追加しました。新しく到着したファイルは、前回と同じメタデータが続くまで処理を待ちます。
+バックアップ復元検証GUIは独立した機能であり、同じ画面から操作できる
+機能として宣伝しません。実機テストと販売パッケージ制作はコード担当へ
+引き継ぐ項目です。GitHub Actionsの最新実行がPASSしない限り、
+商用完成とは判定しません。詳細は `docs/FOLDER_GUIDED_GUI_DRAFT.md`。
+
+
+### Ordered multi-rule GUI (2026-10-18 source draft)
+The desktop **Additional rules** modal adds/reorders/removes up to nine rules
+beside the primary first rule (ten total). Every extra filename glob, action
+(copy/move) and destination is validated using the same safe form validator;
+overwrite=false is mandatory and destinations remain inside the selected root.
+The first matching rule wins; a matching rule whose output already exists is
+blocked rather than falling through to a later rule. The confirmation dialog
+lists **all** effective rules, and editing the rule list revokes Dry Run approval.
+This works for both manual execution and optional folder watching; it is not
+a regex editor, recursive organizer or arbitrary script runner.
+
+New regression tests are authored in tests/test_folder_gui_flow.py. GitHub
+Actions jobs are still failing before any step, so CI PASS and clean Windows
+GUI acceptance are **not** established. Keep commercial release HOLD.
