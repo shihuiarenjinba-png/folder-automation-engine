@@ -34,7 +34,7 @@ Existing repository evidence from an owner screenshot records:
 
 1. The Folder GUI `folder_desktop_app.py` defaulted to Japanese on each launch and never wired the existing local preference helper into the locale selector. **Repair staged on separate QA branch** with no-new-feature persistence limited to `locale` and fail-closed behavior when preferences cannot be saved. New no-window tests added. This repair is **not present in the baseline ZIP/MSIX** above. Build fresh binaries from the revised commit and verify all SHA256 again before evaluating this repair.
 2. The older `docs/WINDOWS_QA_RUNBOOK.md`, `docs/WINDOWS_MANUAL_ACCEPTANCE.md`, and `qa/windows-acceptance.ps1` primarily validate the independently launched Backup Restore Verifier, not this Folder GUI. Its legacy validation-manifest fields differ from `build-folder-desktop-validation.ps1`. **Do not apply the Backup Restore Verifier PASS to this product or pass the Folder GUI manifest to that collector.** The correct Folder GUI builder is `build-folder-desktop-validation.ps1`; the correct store builder is `store/build_msix_draft.ps1`.
-3. The Folder GUI offers **save new config JSON** but there is no verified UI import/reopen path that restores saved folder/rule settings after restart. **Manual restart acceptance remains HOLD**; do not claim saved-rule restoration without a verified workflow.
+3. The baseline Folder GUI offered **save new config JSON** without a corresponding UI import/reopen path. A safe **Load saved JSON config** action is now staged on this separate QA branch: it validates against the exact no-overwrite schema, rejects modified/unsupported fields and revokes old Dry Run approval. **Fresh exact-head Windows CI and real restart acceptance remain HOLD**; do not claim observed restoration yet.
 4. `approved_logo=false`, `symlink_safety_tests_complete=false`, `manual_windows_acceptance=false`, `signed=false`, `sale_approved=false` in MSIX validation.
 5. Backup restore verification is a separate GUI; it must not be shown as a tab/integrated feature in this SKU's Store listing.
 
@@ -49,7 +49,7 @@ After the QA branch build passes GitHub CI, capture its *new exact* commit and *
 | W01 | Verify exact executable hash, provenance, no unexpected sign claim | PENDING |
 | W02 | First launch, clear user instructions, no hidden primary controls | PENDING |
 | W03 | Japanese → English → Japanese; restart and confirm saved language | PENDING |
-| W04 | Save a rule/config, close and restore/reuse without editing JSON manually | PENDING / UI GAP |
+| W04 | Save a rule/config, close and reload via GUI; reject unsafe JSON; new Dry Run mandatory | PENDING (fix staged) |
 | W05 | 1024x768 and 1280x720, with 100/125/150% real Windows display scaling | PENDING |
 | W06 | Keyboard traversal, scrollable results, errors visible in both languages | PENDING |
 | W07 | Use synthetic *.csv and *.txt: Dry Run creates no output / audit changes | PENDING |
