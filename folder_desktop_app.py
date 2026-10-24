@@ -38,6 +38,33 @@ def save_gui_language(language: str) -> None:
     save_preferences(_GUI_PREF_PRODUCT, {"locale": language}, _GUI_PREF_FIELDS)
 
 
+def validate_saved_config(data: object) -> dict:
+    """Accept only exact, safe Folder GUI config schema (never enable overwrite)."""
+    if not isinstance(data, dict):
+        raise ConfigError("Saved configuration must be a JSON object")
+    rules = data.get("rules")
+    if not isinstance(rules, list) or not 1 <= len(rules) <= 10 or any(
+        not isinstance(item, dict) for item in rules
+    ):
+        raise ConfigError("Saved configuration must contain 1–10 folder rules")
+    try:
+        first = rules[0]
+        rebuilt = build_multi_config(
+            root_dir=data["root_dir"], input_folder=data["input_dir"],
+            output_folder=first["destination"], filename_glob=first["glob"],
+            action=first["action"],
+            extra_rules=[
+                {"destination": r["destination"], "glob": r["glob"], "action": r["action"]}
+                for r in rules[1:]
+            ],
+        )
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ConfigError("Missing or invalid saved rule fields") from exc
+    if rebuilt != data:
+        raise ConfigError("Saved configuration was changed or enables unsupported settings")
+    return rebuilt
+
+
 class FolderDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -153,10 +180,16 @@ class FolderDesktop:
             buttons, text=self.t("確認して1回実行", "Confirm and run once"), command=self.run_live
         )
         self.run_btn.pack(side="left", padx=(0, 10))
+        configs = ttk.Frame(frame)
+        configs.pack(fill="x", pady=(0, 10))
         self.save_btn = ttk.Button(
-            buttons, text=self.t("設定JSONを新規保存", "Save a new JSON config"), command=self.save_config
+            configs, text=self.t("設定JSONを新規保存", "Save new JSON config"), command=self.save_config
         )
-        self.save_btn.pack(side="left")
+        self.save_btn.pack(side="left", padx=(0, 10))
+        self.load_btn = ttk.Button(
+            configs, text=self.t("保存済み設定を読み込む", "Load saved JSON config"), command=self.load_config
+        )
+        self.load_btn.pack(side="left")
         watcher = ttk.LabelFrame(frame, text=self.t("④ 安全な常時監視（任意）", "4. Opt-in folder watcher"), padding=8)
         watcher.pack(fill="x", pady=(0, 10))
         ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
@@ -347,7 +380,7 @@ class FolderDesktop:
         for entry in self.entries:
             entry.configure(state=state)
         self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
-        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.rules_btn):
+        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.load_btn, self.rules_btn):
             button.configure(state=state)
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
@@ -545,6 +578,43 @@ class FolderDesktop:
             pass
         if self.root.winfo_exists():
             self.root.after(100, self.poll)
+
+    def load_config(self) -> None:
+        """Restore a deliberately selected saved JSON without file operations."""
+        if self.busy or self.watch_active:
+            return
+        name = filedialog.askopenfilename(
+            parent=self.root, filetypes=[("JSON", "*.json")]
+        )
+        if not name:
+            return
+        try:
+            path = Path(name)
+            if path.is_symlink() or path.stat().st_size > 65536:
+                raise ConfigError("Unsafe config path or JSON larger than 64 KiB")
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            config = validate_saved_config(saved)
+        except (OSError, ValueError, ConfigError, UnicodeError) as exc:
+            messagebox.showerror(
+                self.t("設定の読込エラー", "Could not load saved config"),
+                str(exc), parent=self.root,
+            )
+            return
+        self.root_path.set(config["root_dir"])
+        self.input_folder.set(config["input_dir"])
+        self.output_folder.set(config["rules"][0]["destination"])
+        self.pattern.set(config["rules"][0]["glob"])
+        self.action.set(config["rules"][0]["action"])
+        self.extra_rules = [
+            {"destination": r["destination"], "glob": r["glob"], "action": r["action"]}
+            for r in config["rules"][1:]
+        ]
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.status.set(self.t(
+            "設定を読み込みました。再度試運転してから実行してください。",
+            "Config loaded. Run a new Dry Run before any live action.",
+        ))
 
     def save_config(self) -> None:
         if self.busy or self.watch_active:
