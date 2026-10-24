@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from folder_desktop_app import FolderDesktop
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +14,8 @@ class FakeVariable:
         self.value = None
     def set(self, value):
         self.value = value
+    def get(self):
+        return self.value or ""
 
 class ConsumerV2GuiTests(unittest.TestCase):
     def test_folder_location_is_selected_not_typed(self):
@@ -52,6 +56,76 @@ class ConsumerV2GuiTests(unittest.TestCase):
             self.assertIsNone(pattern.value)
             self.assertEqual(model.preview_revision, "approved")
             self.assertEqual(model.preview_input_snapshot, ("before",))
+
+    def test_picker_rejects_outside_folder_and_links(self):
+        with TemporaryDirectory() as d:
+            base = Path(d)
+            root = base / "root"
+            outsider = base / "outside"
+            root.mkdir()
+            outsider.mkdir()
+            model = SimpleNamespace(
+                busy=False, watch_active=False, root=None,
+                root_path=FakeVariable(), input_folder=FakeVariable(),
+                output_folder=FakeVariable(), status=FakeVariable(),
+                preview_revision="approved",
+                preview_input_snapshot=("before",),
+                t=lambda ja, en: en,
+            )
+            model.root_path.set(str(root))
+            model.input_folder.set("inbox")
+            model.output_folder.set("processed")
+            with patch("folder_desktop_app.filedialog.askdirectory", return_value=str(outsider)):
+                with patch("folder_desktop_app.messagebox.showerror") as showerror:
+                    FolderDesktop._choose_child_folder(model, for_input=True)
+            self.assertTrue(showerror.called)
+            self.assertEqual(model.input_folder.get(), "inbox")
+            self.assertEqual(model.preview_revision, "approved")
+
+    def test_browsed_folders_revoke_approved_preview(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "inbox").mkdir()
+            (root / "processed").mkdir()
+            model = SimpleNamespace(
+                busy=False, watch_active=False, root=None,
+                root_path=FakeVariable(), input_folder=FakeVariable(),
+                output_folder=FakeVariable(), status=FakeVariable(),
+                preview_revision="approved",
+                preview_input_snapshot=("before",),
+                t=lambda ja, en: en,
+            )
+            model.root_path.set(str(root))
+            model.input_folder.set("original")
+            model.output_folder.set("processed")
+            with patch("folder_desktop_app.filedialog.askdirectory", return_value=str(root / "inbox")):
+                FolderDesktop._choose_child_folder(model, for_input=True)
+            self.assertEqual(model.input_folder.get(), "inbox")
+            self.assertIsNone(model.preview_revision)
+            self.assertIsNone(model.preview_input_snapshot)
+            self.assertIn("Preview again", model.status.get())
+
+    def test_destination_cannot_equal_source(self):
+        with TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "inbox").mkdir()
+            model = SimpleNamespace(
+                busy=False, watch_active=False, root=None,
+                root_path=FakeVariable(), input_folder=FakeVariable(),
+                output_folder=FakeVariable(), status=FakeVariable(),
+                preview_revision="approved",
+                preview_input_snapshot=("before",),
+                t=lambda ja, en: en,
+            )
+            model.root_path.set(str(root))
+            model.input_folder.set("inbox")
+            model.output_folder.set("out")
+            with patch("folder_desktop_app.filedialog.askdirectory", return_value=str(root / "inbox")):
+                with patch("folder_desktop_app.messagebox.showerror") as showerror:
+                    FolderDesktop._choose_child_folder(model, for_input=False)
+            self.assertTrue(showerror.called)
+            self.assertEqual(model.output_folder.get(), "out")
+            self.assertEqual(model.preview_revision, "approved")
 
 if __name__ == "__main__":
     unittest.main()
