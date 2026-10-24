@@ -220,8 +220,14 @@ class FolderDesktop:
         """Convert beginner wording into the unchanged safe engine action."""
         if self.busy or self.watch_active:
             return
-        new_action = ("copy" if self.action_display.get() ==
-                      self.t("コピー（元を残す）", "Copy (keep original)") else "move")
+        choices = {
+            self.t("コピー（元を残す）", "Copy (keep original)"): "copy",
+            self.t("移動（元から移す）", "Move (remove original)"): "move",
+        }
+        new_action = choices.get(self.action_display.get())
+        if new_action is None:
+            # Never turn unknown display text into a destructive move.
+            return
         if new_action != self.action.get():
             self.action.set(new_action)
             self.preview_revision = None
