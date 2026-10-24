@@ -141,14 +141,21 @@ class FolderDesktop:
                                      "Other file types can be entered in the filename field."),
                   wraplength=620).grid(row=5, column=0, columnspan=3, sticky="w")
         ttk.Label(editor, text=self.t("操作", "Action")).grid(row=6, column=0, sticky="w", pady=5)
+        self.action_display = tk.StringVar(value=self.t(
+            "コピー（元を残す）" if self.action.get() == "copy" else "移動（元から移す）",
+            "Copy (keep original)" if self.action.get() == "copy" else "Move (remove original)"))
         self.action_combo = ttk.Combobox(
-            editor, textvariable=self.action, values=("copy", "move"), state="readonly", width=16
+            editor, textvariable=self.action_display,
+            values=(self.t("コピー（元を残す）", "Copy (keep original)"),
+                    self.t("移動（元から移す）", "Move (remove original)")),
+            state="readonly", width=25
         )
+        self.action_combo.bind("<<ComboboxSelected>>", self.change_action)
         self.action_combo.grid(row=6, column=1, sticky="w", pady=5)
         ttk.Label(
             editor, text=self.t(
-                "copy = 元ファイルを残す / move = 元ファイルを移す。既存ファイルへの上書きは禁止です。",
-                "copy keeps the original; move removes it after safe transfer. Existing files are never overwritten.",
+                "コピーは元ファイルを残し、移動は元の場所から取り除きます。既存ファイルは上書きしません。",
+                "Copy keeps the source. Move removes it after safe transfer. Existing files are never overwritten.",
             ), wraplength=740,
         ).grid(row=7, column=0, columnspan=3, sticky="w", pady=(5, 0))
         self.rules_btn = ttk.Button(
@@ -208,6 +215,19 @@ class FolderDesktop:
         self.preview_input_snapshot = None
         self.status.set(self.t("条件を変更しました。もう一度試運転してください。",
                                "Rule changed. Preview again before running."))
+
+    def change_action(self, _event=None) -> None:
+        """Convert beginner wording into the unchanged safe engine action."""
+        if self.busy or self.watch_active:
+            return
+        new_action = ("copy" if self.action_display.get() ==
+                      self.t("コピー（元を残す）", "Copy (keep original)") else "move")
+        if new_action != self.action.get():
+            self.action.set(new_action)
+            self.preview_revision = None
+            self.preview_input_snapshot = None
+            self.status.set(self.t("操作を変更しました。もう一度試運転してください。",
+                                   "Action changed. Preview again before running."))
 
     def change_language(self, _event=None) -> None:
         if self.busy or self.watch_active:
@@ -343,6 +363,10 @@ class FolderDesktop:
         name = filedialog.askdirectory(parent=self.root)
         if name:
             self.root_path.set(name)
+            self.preview_revision = None
+            self.preview_input_snapshot = None
+            self.status.set(self.t("フォルダーを変更しました。もう一度試運転してください。",
+                                   "Folder changed. Preview again before running."))
 
     def _choose_child_folder(self, *, for_input: bool) -> None:
         """Use the native folder picker; reject paths outside the chosen parent."""
