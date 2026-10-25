@@ -77,3 +77,14 @@ Proof per case: PASS/FAIL/BLOCKED/SKIP, tested commit, executable hash, Windows 
 - Store upload/certification submission/publication and paid Actions/certificates
 
 **Commercial GO requires complete manual GUI/safety gates, final images/assets/notices and Partner Center validation.**
+
+## 6. 2026-10-25 continuation record
+
+- Current branch and remote baseline were rechecked at `1203d6ac8ef1c56f6f11e6a510ec30dd737a0400` before changes.
+- The owner-authorized executable had already been re-hashed and launch-attempted. Code Integrity blocked process creation (events 3077/3033; Policy ID `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`). No warning was bypassed, no Windows security setting changed, and no disposable input changed.
+- A source review found that closing the Tk window during an active worker/watcher did not explicitly wait for a safe processing boundary. The staged repair registers `WM_DELETE_WINDOW`, signals watcher stop, disables further controls and polls active worker/watcher threads before destroying the window.
+- Three safe-close unit tests were added. The complete source suite ran 60 tests: 57 PASS and the previously identified 3 symbolic-link cases SKIP under the standard-user token.
+- A packaged-EXE GUI-window smoke and real window screenshot collector is staged for disposable GitHub-hosted Windows only. It cannot run locally and cannot be reported as human QA or Store artwork.
+- Store listing and privacy drafts were aligned with the implemented settings/config/state paths. A prior-payload third-party inventory was added; exact final-build notices and owner/legal approval remain HOLD.
+
+Fresh exact-commit Windows artifacts, their SHA256 values and CI GUI evidence are PENDING until this update is committed and the workflows complete. W01–W19 remain governed by the table above; no pending human or MSIX gate became PASS through source tests.

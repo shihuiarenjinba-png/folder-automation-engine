@@ -38,6 +38,8 @@ class StoreIdentityDraftTests(unittest.TestCase):
         self.assertIn("build-folder-desktop-validation.ps1",workflow)
         self.assertIn("store/build_msix_draft.ps1",workflow)
         self.assertIn("FolderAutomationEngine-Store-MSIX-UNSIGNED-DRAFT",workflow)
+        self.assertIn("qa/folder-desktop-gui-smoke.ps1", workflow)
+        self.assertIn("Capture packaged EXE GUI startup evidence on disposable runner", workflow)
         self.assertIn("source_commit=$sourceCommit", builder)
         self.assertIn("git -C $repoRoot rev-parse HEAD", builder)
         build_script=(ROOT/"build-folder-desktop-validation.ps1").read_text(encoding="utf-8")
@@ -75,6 +77,19 @@ class StoreIdentityDraftTests(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, workflow)
+
+    def test_ci_gui_smoke_cannot_be_mistaken_for_human_or_store_evidence(self):
+        smoke = (ROOT / "qa" / "folder-desktop-gui-smoke.ps1").read_text(encoding="utf-8")
+        for required in (
+            'RUNNER_ENVIRONMENT -ne "github-hosted"',
+            'automated_runner_only = $true',
+            'human_interactive_qa = $false',
+            'store_listing_eligible = $false',
+            'release_approved = $false',
+            'Folder Automation Engine',
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, smoke)
 
 if __name__ == "__main__":
     unittest.main()

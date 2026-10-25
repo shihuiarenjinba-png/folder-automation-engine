@@ -86,9 +86,12 @@ class FolderDesktop:
         self.watch_active = False
         self.watch_stop = threading.Event()
         self.watch_thread: threading.Thread | None = None
+        self.worker_thread: threading.Thread | None = None
+        self.closing = False
         self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
+        self.root.protocol("WM_DELETE_WINDOW", self.request_close)
         self.root.after(100, self.poll)
 
     def t(self, ja: str, en: str) -> str:
@@ -376,15 +379,20 @@ class FolderDesktop:
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
-        state = "disabled" if busy or self.watch_active else "normal"
+        closing = getattr(self, "closing", False)
+        state = "disabled" if busy or self.watch_active or closing else "normal"
         for entry in self.entries:
             entry.configure(state=state)
-        self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
+        self.action_combo.configure(
+            state="disabled" if busy or self.watch_active or closing else "readonly"
+        )
         for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.load_btn, self.rules_btn):
             button.configure(state=state)
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
-        self.watch_stop_btn.configure(state="normal" if self.watch_active else "disabled")
+        self.watch_stop_btn.configure(
+            state="normal" if self.watch_active and not closing else "disabled"
+        )
 
     def preview(self) -> None:
         if self.busy or self.watch_active:
@@ -456,7 +464,8 @@ class FolderDesktop:
                                    actual_files if mode == "preview" else None))
             except Exception as exc:
                 self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
-        threading.Thread(target=work, daemon=True).start()
+        self.worker_thread = threading.Thread(target=work, daemon=True)
+        self.worker_thread.start()
 
     def start_watch(self) -> None:
         if self.busy or self.watch_active:
@@ -527,6 +536,32 @@ class FolderDesktop:
         if self.watch_active:
             self.watch_stop.set()
             self.status.set(self.t("監視の終了処理中…", "Stopping after current scan…"))
+
+    def request_close(self) -> None:
+        """Close only after active file work reaches a safe boundary."""
+        if getattr(self, "closing", False):
+            return
+        worker = getattr(self, "worker_thread", None)
+        watcher = getattr(self, "watch_thread", None)
+        if not ((worker and worker.is_alive()) or (watcher and watcher.is_alive())):
+            self.root.destroy()
+            return
+        self.closing = True
+        self.watch_stop.set()
+        self.status.set(self.t(
+            "安全に終了しています。現在の処理が終わるまでお待ちください…",
+            "Closing safely. Waiting for the current file operation to finish…",
+        ))
+        self.set_busy(self.busy)
+        self.root.after(100, self._finish_close_when_safe)
+
+    def _finish_close_when_safe(self) -> None:
+        worker = getattr(self, "worker_thread", None)
+        watcher = getattr(self, "watch_thread", None)
+        if (worker and worker.is_alive()) or (watcher and watcher.is_alive()):
+            self.root.after(100, self._finish_close_when_safe)
+            return
+        self.root.destroy()
 
     def poll(self) -> None:
         try:

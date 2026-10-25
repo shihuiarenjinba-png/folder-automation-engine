@@ -1,47 +1,78 @@
-# Microsoft Store listing copy — folder-automation-engine
+# Microsoft Store listing copy — Folder Automation Engine
 
-**DRAFT / Commercial HOLD.** Product slot already exists in Partner Center (Store ID `9P99MJX1R4V6`). Do not create a duplicate listing or submit unapproved packages.
+**DRAFT / Commercial HOLD.** The existing Partner Center product has Store ID `9P99MJX1R4V6`. Do not create a duplicate product or upload an unapproved package.
 
 ## 日本語
 
-**製品名（予約済み）:** Folder Automation Engine
+**製品名（記録上の予約名）:** Folder Automation Engine
 
 **短い説明:**
-条件に合うファイルを、指定フォルダーへ安全にコピー・移動するオフラインWindowsアプリ。実行前の試運転に対応。
+条件に合うローカルファイルを、試運転で確認してから安全にコピー・移動するWindowsアプリです。
 
-**長い説明:**
-Folder Automation Engineは、指定したフォルダーに置かれたファイルを、ファイル名の条件（例：*.pdf）に従って別のフォルダーへコピー・移動するWindows用ツールです。はじめにメインフォルダー・入力先・保存先・条件を選び、試運転で対象を確認してから実行します。新しい初心者向けGUIは、試運転後の1回実行に加えて、同じ承認済みルールを使う任意の常時監視を開始・停止できます。常時監視はアプリを閉じると停止し、既存ファイルは上書きしません。バックアップ復元検証GUIは独立機能で、この製品の整理画面に統合されていません。
+**説明:**
+Folder Automation Engineは、選択したフォルダー内のファイルを、ファイル名パターン（例：`*.pdf`）に従って別のフォルダーへコピーまたは移動するオフラインツールです。
 
-**動作条件・注意:** Real folder permissions, cloud-synced folders and storage media need QA.
-Microsoft Store版の正式な対応OS、アイコン、販売価格、データ宣言、プライバシー/サポートURLは未承認です。第三者の情報・権利・利用規約に従って使用してください。
+メインフォルダー、入力先、保存先、条件を設定し、書き込みを行わない「試運転」で対象を確認してから、明示的な確認操作で1回実行します。最大10件の規則を設定でき、設定JSONを任意の場所へ新規保存して、後から読み込めます。読み込み後や対象ファイルの変更後は、再度試運転が必要です。
+
+既存の保存先ファイルは上書きしません。任意の監視機能は、承認済みの規則と安定した入力だけを処理し、停止操作またはアプリ終了で停止します。アプリは外部サービスへデータを送信せず、広告・分析・アカウントログインも使用しません。
+
+**注意事項:**
+処理前に必ず試運転結果と保存先を確認してください。クラウド同期フォルダー、ネットワークドライブ、特殊なアクセス権、シンボリックリンク／ジャンクション、非常に長いパスは、利用環境ごとの確認が必要です。バックアップ復元検証は別製品・別画面であり、この製品の機能ではありません。
+
+**機能候補（各200文字以内）:**
+
+- 書き込みを行わない試運転
+- 明示確認後の1回コピー／移動
+- 最大10件のファイル名規則
+- 既存ファイルを上書きしない安全設計
+- 設定JSONの保存と安全な再読み込み
+- 任意のフォルダー監視と停止
+- 日本語／英語UIとローカル言語設定保存
+- 外部通信・広告・分析なし
 
 ## English
 
 **Short description:**
-Copy or move local files by filename rules with a no-write preview and no-overwrite default.
+Preview, then safely copy or move local files by filename rules—fully offline on Windows.
 
-**Long description:**
-Folder Automation Engine organizes local files using deterministic filename rules. Choose a main directory, input and output subfolders and a filename pattern; inspect a no-write preview; then explicitly approve a one-time copy or move. The beginner GUI defaults to copy and does not overwrite existing files. After a successful preview, users can optionally start or stop folder watching with the same approved rules; watching stops when the app exits. The independent backup verification interface is not part of the beginner organizer GUI.
+**Description:**
+Folder Automation Engine is an offline Windows tool for copying or moving files from a selected folder according to deterministic filename patterns such as `*.pdf`.
 
-**Requirements and limits:** Real folder permissions, cloud-synced folders and storage media need QA.
+Choose a root folder, input and destination folders, and rules. Review a no-write Dry Run, then explicitly confirm a one-time operation. Up to 10 rules are supported. You can save a new configuration JSON file in a location you choose and safely load it later. Loading a configuration or changing the input files invalidates the previous preview and requires a new Dry Run.
 
-## Screenshots and onboarding captures to collect on Windows
+Existing destination files are never overwritten. Optional watching uses the approved rules and processes stable input only; it stops when requested or when the app closes. The app has no external data transmission, ads, analytics or account sign-in.
 
-1. First-run homepage showing product purpose and 3-step workflow (JP)
-2. Same screen in English
-3. Guided form with realistic but fictional inputs and no secrets
-4. No-write Dry Run result and one-time confirmation
-5. Non-sensitive error state on deliberately invalid input
+**Important:**
+Always review the Dry Run and destination before processing. Cloud-synchronized folders, network drives, unusual permissions, symbolic links/junctions and very long paths require environment-specific validation. Backup restore verification is a separate product and is not included in this app.
 
-Screenshots must be genuine program windows with placeholder/test-only data; no account IDs, API keys, personally identifying file names or private website contents.
+**Feature candidates (200 characters maximum each):**
 
-## Before filling Partner Center
+- No-write Dry Run before processing
+- Explicitly confirmed one-time copy or move
+- Up to 10 filename rules
+- No overwrite of existing destination files
+- Save and safely reload configuration JSON
+- Optional folder watching with a clear stop action
+- Japanese and English UI with local language preference
+- No external network communication, ads or analytics
 
-- [ ] Confirm these descriptions against built product on Windows (do not imply features available in GUI when JSON is required)
-- [ ] Verify the actual reserved title in Partner Center rather than the repo slug above
-- [ ] Approve icon, logo, screenshot rights, third-party notices, license and end-user terms
-- [ ] Decide price, markets, age rating, privacy/support URLs and offline/online dependencies
-- [ ] Compare the final MSIX Identity/Publisher with `store/PARTNER_CENTER_IDENTITY_HANDOFF_20261018.md`
-- [ ] Full QA and explicit owner approval before pressing **Submit for certification**
+## Store screenshots still required
 
-**This copy is prepared documentation only, not evidence of Microsoft Store acceptance.**
+For each listing language, collect genuine installed-candidate screenshots at 1366×768 or larger:
+
+1. First-run three-step workflow
+2. Completed rules and selected disposable test folder
+3. No-write Dry Run results
+4. Confirmed copy/move result with non-sensitive synthetic filenames
+5. Optional: safe validation error or watch status
+
+CI runner captures and Explorer comparison images are QA evidence only, not Store listing images. Do not show user names, credentials, private paths or customer data.
+
+## Partner Center HOLD items
+
+- Re-copy title, Identity Name, Publisher, PFN and version history from the live product.
+- Approve final production icon/logo and verify artwork rights.
+- Approve the Japanese/English copy after human Windows QA.
+- Decide price, Japan/United States availability, age rating, privacy policy, support contact and legal terms.
+- Upload only the final Store package after separate owner approval.
+- Enable publishing hold; certification must not automatically publish the product.

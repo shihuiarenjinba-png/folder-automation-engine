@@ -19,7 +19,7 @@ jobs:
       - name: Validate PowerShell build script syntax
         shell: powershell
         run: |
-          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1")) {
+          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1", "qa/folder-desktop-gui-smoke.ps1")) {
             $tokens = $null
             $parseErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -38,6 +38,17 @@ jobs:
         run: |
           $basePython = (Get-Command python).Source
           ./build-folder-desktop-validation.ps1 -BasePythonPath $basePython
+      - name: Capture packaged EXE GUI startup evidence on disposable runner
+        shell: powershell
+        run: |
+          $candidate = @(Get-ChildItem -Path dist-folder-validation -Directory | Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.FullName 'FolderAutomationEngine\FolderAutomationEngine.exe')
+          })
+          if ($candidate.Count -ne 1) { throw "Expected exactly one FolderAutomationEngine validation payload" }
+          ./qa/folder-desktop-gui-smoke.ps1 `
+            -ExecutablePath (Join-Path $candidate[0].FullName 'FolderAutomationEngine\FolderAutomationEngine.exe') `
+            -EvidenceDirectory (Join-Path $candidate[0].FullName ("ci-gui-smoke-" + $env:GITHUB_RUN_ID)) `
+            -EphemeralRunner
       - name: Build and verify unsigned Store MSIX draft
         shell: powershell
         run: |
