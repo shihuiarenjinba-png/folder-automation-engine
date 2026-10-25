@@ -16,6 +16,53 @@ from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine
 from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs, format_activity
+from ui_preferences import load_preferences, save_preferences
+
+_GUI_PREF_PRODUCT = "FolderAutomationEngine"
+_GUI_PREF_FIELDS = ("locale",)
+_GUI_LANGUAGES = ("日本語", "English")
+
+
+def load_gui_language() -> str:
+    """Read only the allowlisted locale, without changing a damaged settings file."""
+    try:
+        value = load_preferences(_GUI_PREF_PRODUCT, _GUI_PREF_FIELDS).get("locale", "日本語")
+    except (OSError, ValueError):
+        return "日本語"
+    return value if value in _GUI_LANGUAGES else "日本語"
+
+
+def save_gui_language(language: str) -> None:
+    if language not in _GUI_LANGUAGES:
+        raise ValueError("Unsupported GUI language")
+    save_preferences(_GUI_PREF_PRODUCT, {"locale": language}, _GUI_PREF_FIELDS)
+
+
+def validate_saved_config(data: object) -> dict:
+    """Accept only exact, safe Folder GUI config schema (never enable overwrite)."""
+    if not isinstance(data, dict):
+        raise ConfigError("Saved configuration must be a JSON object")
+    rules = data.get("rules")
+    if not isinstance(rules, list) or not 1 <= len(rules) <= 10 or any(
+        not isinstance(item, dict) for item in rules
+    ):
+        raise ConfigError("Saved configuration must contain 1–10 folder rules")
+    try:
+        first = rules[0]
+        rebuilt = build_multi_config(
+            root_dir=data["root_dir"], input_folder=data["input_dir"],
+            output_folder=first["destination"], filename_glob=first["glob"],
+            action=first["action"],
+            extra_rules=[
+                {"destination": r["destination"], "glob": r["glob"], "action": r["action"]}
+                for r in rules[1:]
+            ],
+        )
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ConfigError("Missing or invalid saved rule fields") from exc
+    if rebuilt != data:
+        raise ConfigError("Saved configuration was changed or enables unsupported settings")
+    return rebuilt
 
 
 class FolderDesktop:
@@ -24,8 +71,8 @@ class FolderDesktop:
         self.root.title("Folder Automation Engine")
         self.root.geometry("900x690")
         self.root.minsize(720, 570)
-        self.lang = tk.StringVar(value="日本語")
-        self.displayed_language = "日本語"
+        self.lang = tk.StringVar(value=load_gui_language())
+        self.displayed_language = self.lang.get()
         self.root_path = tk.StringVar()
         self.input_folder = tk.StringVar(value="inbox")
         self.output_folder = tk.StringVar(value="processed")
@@ -39,9 +86,12 @@ class FolderDesktop:
         self.watch_active = False
         self.watch_stop = threading.Event()
         self.watch_thread: threading.Thread | None = None
+        self.worker_thread: threading.Thread | None = None
+        self.closing = False
         self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
+        self.root.protocol("WM_DELETE_WINDOW", self.request_close)
         self.root.after(100, self.poll)
 
     def t(self, ja: str, en: str) -> str:
@@ -133,10 +183,16 @@ class FolderDesktop:
             buttons, text=self.t("確認して1回実行", "Confirm and run once"), command=self.run_live
         )
         self.run_btn.pack(side="left", padx=(0, 10))
+        configs = ttk.Frame(frame)
+        configs.pack(fill="x", pady=(0, 10))
         self.save_btn = ttk.Button(
-            buttons, text=self.t("設定JSONを新規保存", "Save a new JSON config"), command=self.save_config
+            configs, text=self.t("設定JSONを新規保存", "Save new JSON config"), command=self.save_config
         )
-        self.save_btn.pack(side="left")
+        self.save_btn.pack(side="left", padx=(0, 10))
+        self.load_btn = ttk.Button(
+            configs, text=self.t("保存済み設定を読み込む", "Load saved JSON config"), command=self.load_config
+        )
+        self.load_btn.pack(side="left")
         watcher = ttk.LabelFrame(frame, text=self.t("④ 安全な常時監視（任意）", "4. Opt-in folder watcher"), padding=8)
         watcher.pack(fill="x", pady=(0, 10))
         ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
@@ -170,6 +226,20 @@ class FolderDesktop:
         if self.busy or self.watch_active:
             self.lang.set(self.displayed_language)
             return
+        language = self.lang.get()
+        if language not in _GUI_LANGUAGES:
+            self.lang.set(self.displayed_language)
+            return
+        if language != self.displayed_language:
+            try:
+                save_gui_language(language)
+            except (OSError, ValueError) as exc:
+                self.lang.set(self.displayed_language)
+                messagebox.showerror(
+                    self.t("言語の保存に失敗", "Could not save language preference"),
+                    str(exc), parent=self.root,
+                )
+                return
         self.build()
 
     def get_config(self) -> dict:
@@ -309,15 +379,20 @@ class FolderDesktop:
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
-        state = "disabled" if busy or self.watch_active else "normal"
+        closing = getattr(self, "closing", False)
+        state = "disabled" if busy or self.watch_active or closing else "normal"
         for entry in self.entries:
             entry.configure(state=state)
-        self.action_combo.configure(state="disabled" if busy or self.watch_active else "readonly")
-        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.rules_btn):
+        self.action_combo.configure(
+            state="disabled" if busy or self.watch_active or closing else "readonly"
+        )
+        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.load_btn, self.rules_btn):
             button.configure(state=state)
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
-        self.watch_stop_btn.configure(state="normal" if self.watch_active else "disabled")
+        self.watch_stop_btn.configure(
+            state="normal" if self.watch_active and not closing else "disabled"
+        )
 
     def preview(self) -> None:
         if self.busy or self.watch_active:
@@ -389,7 +464,8 @@ class FolderDesktop:
                                    actual_files if mode == "preview" else None))
             except Exception as exc:
                 self.messages.put((mode, False, f"{type(exc).__name__}: {exc}", rev, None))
-        threading.Thread(target=work, daemon=True).start()
+        self.worker_thread = threading.Thread(target=work, daemon=True)
+        self.worker_thread.start()
 
     def start_watch(self) -> None:
         if self.busy or self.watch_active:
@@ -461,6 +537,32 @@ class FolderDesktop:
             self.watch_stop.set()
             self.status.set(self.t("監視の終了処理中…", "Stopping after current scan…"))
 
+    def request_close(self) -> None:
+        """Close only after active file work reaches a safe boundary."""
+        if getattr(self, "closing", False):
+            return
+        worker = getattr(self, "worker_thread", None)
+        watcher = getattr(self, "watch_thread", None)
+        if not ((worker and worker.is_alive()) or (watcher and watcher.is_alive())):
+            self.root.destroy()
+            return
+        self.closing = True
+        self.watch_stop.set()
+        self.status.set(self.t(
+            "安全に終了しています。現在の処理が終わるまでお待ちください…",
+            "Closing safely. Waiting for the current file operation to finish…",
+        ))
+        self.set_busy(self.busy)
+        self.root.after(100, self._finish_close_when_safe)
+
+    def _finish_close_when_safe(self) -> None:
+        worker = getattr(self, "worker_thread", None)
+        watcher = getattr(self, "watch_thread", None)
+        if (worker and worker.is_alive()) or (watcher and watcher.is_alive()):
+            self.root.after(100, self._finish_close_when_safe)
+            return
+        self.root.destroy()
+
     def poll(self) -> None:
         try:
             while True:
@@ -511,6 +613,43 @@ class FolderDesktop:
             pass
         if self.root.winfo_exists():
             self.root.after(100, self.poll)
+
+    def load_config(self) -> None:
+        """Restore a deliberately selected saved JSON without file operations."""
+        if self.busy or self.watch_active:
+            return
+        name = filedialog.askopenfilename(
+            parent=self.root, filetypes=[("JSON", "*.json")]
+        )
+        if not name:
+            return
+        try:
+            path = Path(name)
+            if path.is_symlink() or path.stat().st_size > 65536:
+                raise ConfigError("Unsafe config path or JSON larger than 64 KiB")
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            config = validate_saved_config(saved)
+        except (OSError, ValueError, ConfigError, UnicodeError) as exc:
+            messagebox.showerror(
+                self.t("設定の読込エラー", "Could not load saved config"),
+                str(exc), parent=self.root,
+            )
+            return
+        self.root_path.set(config["root_dir"])
+        self.input_folder.set(config["input_dir"])
+        self.output_folder.set(config["rules"][0]["destination"])
+        self.pattern.set(config["rules"][0]["glob"])
+        self.action.set(config["rules"][0]["action"])
+        self.extra_rules = [
+            {"destination": r["destination"], "glob": r["glob"], "action": r["action"]}
+            for r in config["rules"][1:]
+        ]
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        self.status.set(self.t(
+            "設定を読み込みました。再度試運転してから実行してください。",
+            "Config loaded. Run a new Dry Run before any live action.",
+        ))
 
     def save_config(self) -> None:
         if self.busy or self.watch_active:

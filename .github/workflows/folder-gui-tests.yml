@@ -9,7 +9,12 @@ on:
       - "folder_automation.py"
       - "folder_desktop_app.py"
       - "folder_desktop_flow.py"
+      - "ui_preferences.py"
       - "tests/test_folder_gui_flow.py"
+      - "tests/test_folder_gui_watcher.py"
+      - "tests/test_folder_locale_persistence.py"
+      - "tests/test_folder_config_reload.py"
+      - "tests/test_ui_preferences.py"
       - ".github/workflows/folder-gui-tests.yml"
   workflow_dispatch:
 
@@ -31,7 +36,7 @@ jobs:
           python-version: "3.12"
       - name: Python compile check
         run: python -m compileall -q folder_automation.py folder_desktop_flow.py folder_desktop_app.py tests
-      - name: No-display GUI form tests and filesystem safety
-        run: python -m unittest discover -s tests -p "test_folder_gui_flow.py" -v
-      - name: Existing folder collision regression tests
-        run: python -m unittest discover -s tests -p "test_folder_automation_safety.py" -v
+      - name: No-display Folder GUI, watcher, config and filesystem safety tests
+        run: python -m unittest discover -s tests -p "test_folder_*.py" -v
+      - name: Versioned local preference safety tests
+        run: python -m unittest discover -s tests -p "test_ui_preferences.py" -v

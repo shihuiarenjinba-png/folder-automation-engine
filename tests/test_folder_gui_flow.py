@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -211,6 +212,49 @@ class FolderGuiGateTests(unittest.TestCase):
             self.skipTest(str(exc))
         with self.assertRaises(ConfigError):
             snapshot_inputs(self.cfg)
+
+
+class FolderCloseSafetyTests(unittest.TestCase):
+    def make_app(self, *, worker_alive=False, watcher_alive=False):
+        app = FolderDesktop.__new__(FolderDesktop)
+        app.closing = False
+        app.busy = worker_alive
+        app.watch_active = watcher_alive
+        app.watch_stop = threading.Event()
+        app.worker_thread = Mock(is_alive=Mock(return_value=worker_alive))
+        app.watch_thread = Mock(is_alive=Mock(return_value=watcher_alive))
+        app.root = Mock()
+        app.status = Mock()
+        app.set_busy = Mock()
+        app.t = lambda ja, en: en
+        return app
+
+    def test_idle_close_destroys_window_immediately(self):
+        app = self.make_app()
+        app.request_close()
+        app.root.destroy.assert_called_once_with()
+        app.root.after.assert_not_called()
+
+    def test_active_file_operation_waits_before_destroy(self):
+        app = self.make_app(worker_alive=True)
+        app.request_close()
+        self.assertTrue(app.closing)
+        self.assertTrue(app.watch_stop.is_set())
+        app.root.destroy.assert_not_called()
+        app.root.after.assert_called_once_with(100, app._finish_close_when_safe)
+
+        app.worker_thread.is_alive.return_value = False
+        app._finish_close_when_safe()
+        app.root.destroy.assert_called_once_with()
+
+    def test_active_watcher_is_signaled_and_waited_for(self):
+        app = self.make_app(watcher_alive=True)
+        app.request_close()
+        self.assertTrue(app.watch_stop.is_set())
+        app.root.destroy.assert_not_called()
+        app.watch_thread.is_alive.return_value = False
+        app._finish_close_when_safe()
+        app.root.destroy.assert_called_once_with()
 
 
 if __name__ == "__main__":
