@@ -88,7 +88,7 @@ class FolderDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Folder Automation Engine")
-        self.root.geometry("960x740")
+        self.root.geometry("940x650")
         self.root.minsize(720, 570)
         self.lang = tk.StringVar(value=load_gui_language())
         self.displayed_language = self.lang.get()
@@ -228,6 +228,10 @@ class FolderDesktop:
                 "Existing files are never overwritten. Copy is selected by default.",
             ), wraplength=740,
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
+        ttk.Label(editor, text=self.t(
+            "整理元・整理先は親フォルダー直下の既存サブフォルダーから選べます。",
+            "Choose existing source/destination subfolders directly inside the parent."),
+            foreground="#415168").grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
         buttons = ttk.LabelFrame(frame, text=self.t("② 試運転 → ③ 実行", "2. Preview → 3. Run"), padding=8)
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
@@ -237,7 +241,8 @@ class FolderDesktop:
         self.run_btn = tk.Button(
             buttons, text=self.t("確認して実行", "Confirm and run"),
             command=self.run_live, bg="#1966ba", fg="white", activebackground="#14518f",
-            activeforeground="white", relief="flat", bd=0, padx=18, pady=8,
+            activeforeground="white", disabledforeground="#425066",
+            relief="flat", bd=0, padx=18, pady=8,
             font=("Segoe UI", 10, "bold"), cursor="hand2"
         )
         self.run_btn.pack(side="left", padx=(0, 10))
@@ -519,8 +524,10 @@ class FolderDesktop:
         for button in (self.choose_btn, self.preview_btn, self.save_btn, self.load_btn,
                        self.rules_btn, self.advanced_btn, *self.child_browse_buttons):
             button.configure(state=state)
+        can_run = state == "normal" and self.preview_revision is not None
         self.run_btn.configure(
-            state="normal" if state == "normal" and self.preview_revision is not None else "disabled"
+            state="normal" if can_run else "disabled",
+            bg="#1966ba" if can_run else "#d6e0ed"
         )
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
