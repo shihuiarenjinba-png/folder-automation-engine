@@ -287,8 +287,8 @@ class FolderDesktop:
 
 
         ttk.Label(frame, text=self.t(
-            "安全: 常時監視は任意・承認したルールのみ。バックアップ復元検証は別画面です。",
-            "Safety: watch mode is optional and uses only the approved rule. Backup verification is separate.",
+            "安全な使い方：試運転で対象を確認し、承認してからコピー・移動します。自動監視は必要な時だけ開始できます。",
+            "Safe workflow: review files in the preview, then approve copy or move. Start optional watching only when needed.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
 
