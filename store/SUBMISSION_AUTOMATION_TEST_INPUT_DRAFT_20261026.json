@@ -1,0 +1,84 @@
+{
+  "contract": "folder-standard-store-submission-smoke-v1",
+  "purpose": "VALIDATE_ONLY input example; not permission to alter Partner Center",
+  "mode": "VALIDATE_ONLY",
+  "product": {
+    "kind": "app",
+    "name": "Folder Automation Engine",
+    "edition": "standard",
+    "repository": "shihuiarenjinba-png/folder-automation-engine",
+    "work_branch": "codex/folder-standard-consumer-ui-20261026",
+    "pull_request": 10
+  },
+  "package": {
+    "path": null,
+    "sha256": null,
+    "source_commit": null,
+    "artifact_id": null,
+    "architecture": "x64",
+    "format": "msix",
+    "signed_by_store": false,
+    "verified_by_operator": false,
+    "msix_version": null
+  },
+  "store": {
+    "existing_product_id_recorded": "9P99MJX1R4V6",
+    "identity_name_recorded": "OkinawaDesktopTools.FolderAutomationEngine",
+    "publisher_recorded": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
+    "partner_center_reverified": false,
+    "accepted_version_history_verified": false,
+    "price": null,
+    "markets": null,
+    "age_rating": null,
+    "privacy_policy": null,
+    "support_contact": null
+  },
+  "listing": {
+    "ja": {
+      "short_description": null,
+      "long_description": null,
+      "screenshots": []
+    },
+    "en": {
+      "short_description": null,
+      "long_description": null,
+      "screenshots": []
+    },
+    "final_logo": null,
+    "owner_approved": false
+  },
+  "proof": {
+    "windows_user_gui_qa_pass": false,
+    "filesystem_safety_qa_pass": false,
+    "symlink_junction_qa_complete": false,
+    "wack_accepted": false,
+    "third_party_notices_approved": false,
+    "all_screenshots_genuine": false
+  },
+  "permissions": {
+    "validate_only": true,
+    "dry_run": false,
+    "edit_partner_center": false,
+    "upload_package": false,
+    "submit_certification": false,
+    "publish": false,
+    "owner_upload_approval": false,
+    "owner_submission_approval": false,
+    "owner_publish_approval": false
+  },
+  "guards": {
+    "fail_closed_on_identity_mismatch": true,
+    "fail_closed_on_sha_mismatch": true,
+    "fail_closed_on_missing_proof": true,
+    "forbid_duplicate_product": true,
+    "do_not_invent_question_answers": true,
+    "do_not_skip_certification_fields": true,
+    "require_manual_approval_for_each_write_phase": true
+  },
+  "notes": [
+    "This is a proposal for the submission automation script's input adapter; inspect and adapt to its actual existing schema.",
+    "Do not invent a version, price, location, assets or legal answers.",
+    "Prefer validate-only and dry-run tests before any Partner Center mutation.",
+    "A successful form dry-run or CI build cannot grant STORE_UPLOAD_READY."
+  ]
+}
