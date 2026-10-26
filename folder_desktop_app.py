@@ -69,7 +69,7 @@ class FolderDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Folder Automation Engine")
-        self.root.geometry("900x690")
+        self.root.geometry("960x740")
         self.root.minsize(720, 570)
         self.lang = tk.StringVar(value=load_gui_language())
         self.displayed_language = self.lang.get()
@@ -80,6 +80,9 @@ class FolderDesktop:
         self.action = tk.StringVar(value="copy")
         self.extra_rules: list[dict] = []
         self.status = tk.StringVar(value="")
+        self.preview_summary = tk.StringVar(value="")
+        self.watch_indicator = tk.StringVar(value="")
+        self.advanced_visible = False
         self.preview_revision: str | None = None
         self.preview_input_snapshot: tuple | None = None
         self.busy = False
@@ -91,6 +94,8 @@ class FolderDesktop:
         self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
+        for variable in (self.root_path, self.input_folder, self.output_folder, self.pattern, self.action):
+            variable.trace_add("write", self._invalidate_preview_on_edit)
         self.root.protocol("WM_DELETE_WINDOW", self.request_close)
         self.root.after(100, self.poll)
 
@@ -101,8 +106,32 @@ class FolderDesktop:
         self.displayed_language = self.lang.get()
         for child in self.root.winfo_children():
             child.destroy()
-        canvas = tk.Canvas(self.root, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        shell = ttk.Frame(self.root)
+        shell.pack(fill="both", expand=True)
+        self.preview_summary.set(self.t(
+            "① フォルダーと条件を選んで試運転してください。変更はまだ行われません。",
+            "Choose folders and preview first. No files change during preview."))
+        history = ttk.LabelFrame(shell, text=self.t(
+            "③ 対象ファイル・実行結果（常に表示）",
+            "3. Files and activity (always visible)"), padding=9)
+        history.pack(side="bottom", fill="x", padx=12, pady=(3, 10))
+        ttk.Label(history, textvariable=self.preview_summary,
+                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.watch_indicator.set(self.t("監視停止中", "Watching off"))
+        ttk.Label(history, textvariable=self.watch_indicator).pack(anchor="e")
+        ttk.Label(history, textvariable=self.status, wraplength=820).pack(anchor="w")
+        logframe = ttk.Frame(history)
+        logframe.pack(fill="x", pady=(4, 0))
+        self.log = tk.Text(logframe, wrap="word", height=5, state="disabled",
+                           bg="#f7fafd", fg="#21384f", padx=8, pady=6, relief="flat")
+        logscroll = ttk.Scrollbar(logframe, command=self.log.yview)
+        self.log.configure(yscrollcommand=logscroll.set)
+        self.log.pack(side="left", fill="both", expand=True)
+        logscroll.pack(side="right", fill="y")
+        formhost = ttk.Frame(shell)
+        formhost.pack(fill="both", expand=True, padx=10, pady=(7, 0))
+        canvas = tk.Canvas(formhost, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(formhost, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
@@ -125,17 +154,15 @@ class FolderDesktop:
         ttk.Label(
             frame,
             text=self.t(
-                "指定したフォルダーのファイルを、拡張子などの条件に応じて別フォルダーへコピー・移動します。\n"
-                "①フォルダーと条件を選択 → ②試運転で対象を確認 → ③確認後に1回実行。",
-                "Copy or move files into another folder based on a filename pattern.\n"
-                "1. Choose folders and rule → 2. Preview files without changes → 3. Confirm and run once.",
+                "① 親フォルダーを選ぶ → 整理元と整理先を選ぶ → ② 試運転 → 結果確認 → 実行",
+                "1. Choose a parent folder and two subfolders → 2. Preview → Review results → Run",
             ),
             wraplength=810, justify="left",
         ).pack(anchor="w", pady=(10, 12))
         editor = ttk.LabelFrame(frame, text=self.t("① 整理する条件", "1. Choose your rule"), padding=12)
         editor.pack(fill="x", pady=(0, 10))
         editor.columnconfigure(1, weight=1)
-        ttk.Label(editor, text=self.t("基準フォルダー", "Main folder")).grid(
+        ttk.Label(editor, text=self.t("親フォルダー", "Parent folder")).grid(
             row=0, column=0, sticky="w", padx=(0, 8), pady=5
         )
         self.root_entry = ttk.Entry(editor, textvariable=self.root_path)
@@ -145,18 +172,24 @@ class FolderDesktop:
         )
         self.choose_btn.grid(row=0, column=2, padx=(8, 0))
         rows = [
-            (1, "読み込み先の名前（基準内）", "Input folder name (inside main)", self.input_folder),
-            (2, "保存先の名前（基準内）", "Output folder name (inside main)", self.output_folder),
+            (1, "整理するフォルダー（親の直下）", "Source subfolder (inside parent)", self.input_folder),
+            (2, "コピー・移動先（親の直下）", "Destination subfolder (inside parent)", self.output_folder),
             (3, "対象ファイル（例 *.pdf）", "Filename pattern (e.g. *.pdf)", self.pattern),
         ]
         self.entries: list[ttk.Entry] = [self.root_entry]
+        self.child_browse_buttons = []
         for row, ja, en, variable in rows:
             ttk.Label(editor, text=self.t(ja, en)).grid(
                 row=row, column=0, sticky="w", padx=(0, 8), pady=5
             )
             entry = ttk.Entry(editor, textvariable=variable)
-            entry.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+            entry.grid(row=row, column=1, sticky="ew", pady=5)
             self.entries.append(entry)
+            if row <= 2:
+                browse = ttk.Button(editor, text=self.t("選択", "Choose"),
+                    command=lambda v=variable: self.choose_child_folder(v))
+                browse.grid(row=row, column=2, padx=(8, 0))
+                self.child_browse_buttons.append(browse)
         ttk.Label(editor, text=self.t("操作", "Action")).grid(row=4, column=0, sticky="w", pady=5)
         self.action_combo = ttk.Combobox(
             editor, textvariable=self.action, values=("copy", "move"), state="readonly", width=16
@@ -178,9 +211,12 @@ class FolderDesktop:
         self.preview_btn = ttk.Button(
             buttons, text=self.t("試運転（変更なし）", "Dry Run (no changes)"), command=self.preview
         )
-        self.preview_btn.pack(side="left", padx=(0, 10))
-        self.run_btn = ttk.Button(
-            buttons, text=self.t("確認して1回実行", "Confirm and run once"), command=self.run_live
+        self.preview_btn.pack(side="left", padx=(0, 14), ipady=7, ipadx=8)
+        self.run_btn = tk.Button(
+            buttons, text=self.t("確認して実行", "Confirm and run"),
+            command=self.run_live, bg="#1966ba", fg="white", activebackground="#14518f",
+            activeforeground="white", relief="flat", bd=0, padx=18, pady=8,
+            font=("Segoe UI", 10, "bold"), cursor="hand2"
         )
         self.run_btn.pack(side="left", padx=(0, 10))
         configs = ttk.Frame(frame)
@@ -208,14 +244,8 @@ class FolderDesktop:
             "開始時にルールを承認します。今後届くファイルにも適用します。PCとアプリの稼働中のみ。",
             "Approved rule also processes future files. Runs only while app and PC stay on."),
             wraplength=360).pack(side="right", padx=(12, 0))
-        ttk.Label(frame, textvariable=self.status, wraplength=820).pack(anchor="w", pady=(0, 8))
-        logframe = ttk.LabelFrame(frame, text=self.t("対象ファイル・実行結果", "Preview and results"), padding=8)
-        logframe.pack(fill="both", expand=True)
-        self.log = tk.Text(logframe, wrap="word", height=10, state="disabled")
-        scrollbar = ttk.Scrollbar(logframe, command=self.log.yview)
-        self.log.configure(yscrollcommand=scrollbar.set)
-        self.log.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+
+
         ttk.Label(frame, text=self.t(
             "安全: 常時監視は任意・承認したルールのみ。バックアップ復元検証は別画面です。",
             "Safety: watch mode is optional and uses only the approved rule. Backup verification is separate.",
@@ -386,8 +416,12 @@ class FolderDesktop:
         self.action_combo.configure(
             state="disabled" if busy or self.watch_active or closing else "readonly"
         )
-        for button in (self.choose_btn, self.preview_btn, self.run_btn, self.save_btn, self.load_btn, self.rules_btn):
+        for button in (self.choose_btn, self.preview_btn, self.save_btn, self.load_btn,
+                       self.rules_btn, self.advanced_btn, *self.child_browse_buttons):
             button.configure(state=state)
+        self.run_btn.configure(
+            state="normal" if state == "normal" and self.preview_revision is not None else "disabled"
+        )
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
         self.watch_stop_btn.configure(
