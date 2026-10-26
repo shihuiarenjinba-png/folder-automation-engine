@@ -14,6 +14,7 @@ on:
       - "tests/test_folder_gui_watcher.py"
       - "tests/test_folder_locale_persistence.py"
       - "tests/test_folder_config_reload.py"
+      - "tests/test_folder_consumer_ui.py"
       - "tests/test_ui_preferences.py"
       - ".github/workflows/folder-gui-tests.yml"
   workflow_dispatch:
