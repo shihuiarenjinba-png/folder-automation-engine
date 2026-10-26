@@ -484,7 +484,8 @@ class FolderDesktop:
         try:
             candidate = Path(chosen).expanduser()
             if (candidate.is_symlink() or not candidate.is_dir()
-                    or candidate.parent.resolve() != root):
+                    or candidate.parent.resolve() != root
+                    or candidate.resolve().parent != root):
                 raise ConfigError(self.t(
                     "親フォルダー直下にある通常のサブフォルダーのみ選択できます。",
                     "Select a regular subfolder directly inside the parent."))
