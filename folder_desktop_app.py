@@ -246,8 +246,8 @@ class FolderDesktop:
             font=("Segoe UI", 10, "bold"), cursor="hand2"
         )
         self.run_btn.pack(side="left", padx=(0, 10))
-        configs = ttk.Frame(frame)
-        configs.pack(fill="x", pady=(0, 10))
+        configs = ttk.Frame(buttons)
+        configs.pack(side="left", padx=(22, 0))
         self.save_btn = ttk.Button(
             configs, text=self.t("設定を保存", "Save rules"), command=self.save_config
         )
