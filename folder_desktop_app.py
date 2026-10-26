@@ -201,11 +201,6 @@ class FolderDesktop:
                 "copy keeps the original; move removes it after safe transfer. Existing files are never overwritten.",
             ), wraplength=740,
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
-        self.rules_btn = ttk.Button(
-            editor, text=self.t("複数ルールを追加・並べ替え（最大10件）",
-                                "Add and reorder rules (up to 10)"),
-            command=self.manage_rules)
-        self.rules_btn.grid(row=6, column=0, columnspan=3, sticky="w", pady=(6, 1))
         buttons = ttk.LabelFrame(frame, text=self.t("② 試運転 → ③ 実行", "2. Preview → 3. Run"), padding=8)
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
@@ -222,14 +217,27 @@ class FolderDesktop:
         configs = ttk.Frame(frame)
         configs.pack(fill="x", pady=(0, 10))
         self.save_btn = ttk.Button(
-            configs, text=self.t("設定JSONを新規保存", "Save new JSON config"), command=self.save_config
+            configs, text=self.t("設定を保存", "Save rules"), command=self.save_config
         )
         self.save_btn.pack(side="left", padx=(0, 10))
         self.load_btn = ttk.Button(
-            configs, text=self.t("保存済み設定を読み込む", "Load saved JSON config"), command=self.load_config
+            configs, text=self.t("保存済み設定を開く", "Open saved rules"), command=self.load_config
         )
         self.load_btn.pack(side="left")
-        watcher = ttk.LabelFrame(frame, text=self.t("④ 安全な常時監視（任意）", "4. Opt-in folder watcher"), padding=8)
+        self.advanced_btn = ttk.Button(frame,
+            text=self.t("詳細設定を閉じる ▲" if self.advanced_visible else "詳細設定・自動監視を表示 ▼",
+                        "Hide advanced options ▲" if self.advanced_visible else
+                        "Advanced rules and watching ▼"), command=self.toggle_advanced)
+        self.advanced_btn.pack(anchor="w", pady=(0, 8))
+        self.advanced_panel = ttk.Frame(frame)
+        if self.advanced_visible:
+            self.advanced_panel.pack(fill="x", pady=(0, 8))
+        self.rules_btn = ttk.Button(self.advanced_panel,
+            text=self.t("複数ルールの追加・並べ替え（最大10件）",
+                        "Add and reorder rules (up to 10)"), command=self.manage_rules)
+        self.rules_btn.pack(anchor="w", pady=(0, 8))
+        watcher = ttk.LabelFrame(self.advanced_panel, text=self.t(
+            "自動監視（任意）", "Optional watching"), padding=8)
         watcher.pack(fill="x", pady=(0, 10))
         ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
         self.watch_interval_entry = ttk.Entry(watcher, textvariable=self.watch_seconds, width=7)
@@ -270,6 +278,8 @@ class FolderDesktop:
                     str(exc), parent=self.root,
                 )
                 return
+        self.preview_revision = None
+        self.preview_input_snapshot = None
         self.build()
 
     def get_config(self) -> dict:
@@ -393,6 +403,61 @@ class FolderDesktop:
         refresh()
         dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
         self.root.wait_window(dialog)
+
+    def _invalidate_preview_on_edit(self, *_args) -> None:
+        """Revoke approval as soon as a folder, pattern or action changes."""
+        self.preview_revision = None
+        self.preview_input_snapshot = None
+        if getattr(self, "preview_summary", None) is not None:
+            self.preview_summary.set(self.t(
+                "設定を変更しました。もう一度試運転してください。",
+                "Rules changed. Preview again before running."))
+        if getattr(self, "run_btn", None) is not None:
+            self.set_busy(self.busy)
+
+    def toggle_advanced(self) -> None:
+        if self.busy or self.watch_active or getattr(self, "closing", False):
+            return
+        self.advanced_visible = not self.advanced_visible
+        if self.advanced_visible:
+            self.advanced_panel.pack(fill="x", pady=(0, 8))
+        else:
+            self.advanced_panel.pack_forget()
+        self.advanced_btn.configure(text=self.t(
+            "詳細設定を閉じる ▲" if self.advanced_visible else "詳細設定・自動監視を表示 ▼",
+            "Hide advanced options ▲" if self.advanced_visible else "Advanced rules and watching ▼"))
+
+    def choose_child_folder(self, target: tk.StringVar) -> None:
+        """Only allow selecting a real direct subfolder of the chosen parent."""
+        if self.busy or self.watch_active or getattr(self, "closing", False):
+            return
+        try:
+            if not self.root_path.get().strip():
+                raise ConfigError(self.t("先に親フォルダーを選んでください。",
+                                         "Choose a parent folder first."))
+            root = Path(self.root_path.get()).expanduser().resolve(strict=True)
+            if not root.is_dir():
+                raise ConfigError("Parent folder must be a directory")
+        except (OSError, ValueError, ConfigError) as exc:
+            messagebox.showwarning(self.t("親フォルダーが必要", "Choose parent"),
+                                   str(exc), parent=self.root)
+            return
+        chosen = filedialog.askdirectory(parent=self.root, initialdir=str(root),
+                 title=self.t("親フォルダー直下のサブフォルダーを選択",
+                              "Choose a direct subfolder of the parent"))
+        if not chosen:
+            return
+        try:
+            candidate = Path(chosen).expanduser()
+            if (candidate.is_symlink() or not candidate.is_dir()
+                    or candidate.parent.resolve() != root):
+                raise ConfigError(self.t(
+                    "親フォルダー直下にある通常のサブフォルダーのみ選択できます。",
+                    "Select a regular subfolder directly inside the parent."))
+            target.set(candidate.name)
+        except (OSError, ValueError, ConfigError) as exc:
+            messagebox.showwarning(self.t("選択できません", "Invalid folder"),
+                                   str(exc), parent=self.root)
 
     def choose_folder(self) -> None:
         if self.busy or self.watch_active:
@@ -528,6 +593,8 @@ class FolderDesktop:
         self.preview_input_snapshot = None
         self.watch_stop.clear()
         self.watch_active = True
+        if getattr(self, "watch_indicator", None) is not None:
+            self.watch_indicator.set(self.t("● 監視中", "● Watching"))
         self.set_busy(False)
         self.status.set(self.t("監視を開始中…", "Starting watcher…"))
 
@@ -616,6 +683,9 @@ class FolderDesktop:
                     elif ok:
                         self.status.set(self.t("監視中（ルールによる処理が完了）",
                                                "Watching (scan completed)"))
+                    if getattr(self, "watch_indicator", None) is not None:
+                        self.watch_indicator.set(self.t("● 監視中", "● Watching")
+                            if self.watch_active else self.t("監視停止中", "Watching off"))
                     self.set_busy(False)
                     continue
                 self.set_busy(False)
