@@ -34,3 +34,11 @@ Base (exact latest existing QA HEAD): `1a98a6e725f21c248dfd230e03bf4811fbf2dcf2`
 8. Rebuild MSIX from exact candidate SHA. Do not reuse SHA256 or Store approval flags from earlier package.
 
 **Technical QA and Store sale readiness are distinct; do not mark sale GO based on CI.**
+
+## 2026-11-12 code-owner continuation
+
+- Reconfirmed PR #10 head `b3c573da20d571b939526f480c317d0032f06164` and downloaded artifacts `12621511814` / `12620529654`. Their EXE and unsigned MSIX hashes matched the handoff exactly.
+- A disposable Windows junction probe found that the prior code treated a junction to a sibling directory as a regular input folder. This was a release-blocking gap against the stated symlink/junction policy.
+- The engine, configuration flow and child-folder picker now reject both symbolic links and Windows directory junctions before resolving paths. Windows junction regression tests cover input, destination and GUI child selection without touching user data.
+- Source tests pass under a normal user token. The three existing symbolic-link cases remain skipped because this machine cannot create symbolic links without a privilege not granted to the test process; they remain `NOT_TESTED` for final Store acceptance.
+- Because source code changed after `b3c573d`, the downloaded EXE/MSIX are provenance evidence only and are no longer final-candidate packages. Fresh exact-head CI artifacts, hashes, human Windows GUI acceptance, genuine Store screenshots, MSIX install/update/uninstall and WACK are required before changing the sale HOLD.

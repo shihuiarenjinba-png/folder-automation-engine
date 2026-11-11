@@ -15,7 +15,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from folder_automation import ConfigError, Engine
+from folder_automation import ConfigError, Engine, is_link_like
 from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs, format_activity
 from ui_preferences import load_preferences, save_preferences
 
@@ -488,7 +488,7 @@ class FolderDesktop:
             return
         try:
             candidate = Path(chosen).expanduser()
-            if (candidate.is_symlink() or not candidate.is_dir()
+            if (is_link_like(candidate) or not candidate.is_dir()
                     or candidate.parent.resolve() != root
                     or candidate.resolve().parent != root):
                 raise ConfigError(self.t(
@@ -784,7 +784,7 @@ class FolderDesktop:
             return
         try:
             path = Path(name)
-            if path.is_symlink() or path.stat().st_size > 65536:
+            if is_link_like(path) or path.stat().st_size > 65536:
                 raise ConfigError("Unsafe config path or JSON larger than 64 KiB")
             saved = json.loads(path.read_text(encoding="utf-8"))
             config = validate_saved_config(saved)

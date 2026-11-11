@@ -19,6 +19,12 @@ class ConfigError(RuntimeError):
     pass
 
 
+def is_link_like(path: Path) -> bool:
+    """Return True for symbolic links and Windows directory junctions."""
+    junction_check = getattr(path, "is_junction", None)
+    return path.is_symlink() or bool(junction_check and junction_check())
+
+
 class RuleResult(str, Enum):
     NO_MATCH = "no_match"
     HANDLED = "handled"
@@ -29,7 +35,10 @@ class Engine:
     def __init__(self, config: dict[str, Any], dry_run: bool = False) -> None:
         self.config = config
         self.dry_run = dry_run
-        self.root = Path(config.get("root_dir", ".")).expanduser().resolve()
+        root_path = Path(config.get("root_dir", ".")).expanduser()
+        if is_link_like(root_path):
+            raise ConfigError(f"Symbolic-link or junction root is not supported: {root_path}")
+        self.root = root_path.resolve()
         self.input_dir = self._path(config.get("input_dir", "inbox"))
         self.interval = max(float(config.get("poll_seconds", 5)), 1.0)
         self.rules = config.get("rules", [])
@@ -45,7 +54,20 @@ class Engine:
         path = Path(value).expanduser()
         if not path.is_absolute():
             path = self.root / path
-        path = path.resolve()
+        # Inspect the unresolved path first. Calling resolve() before this check
+        # would hide a Windows junction or symbolic-link component.
+        unresolved = Path(os.path.abspath(path))
+        current = unresolved
+        while True:
+            if is_link_like(current):
+                raise ConfigError(f"Symbolic-link or junction path is not supported: {current}")
+            if current == self.root:
+                break
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+        path = unresolved.resolve()
         try:
             path.relative_to(self.root)
         except ValueError as exc:
@@ -136,8 +158,8 @@ class Engine:
         # overwrite=true. Resolving also prevents a symlink from escaping root.
         if src.resolve() == dst.resolve() or (dst.exists() and src.samefile(dst)):
             raise ConfigError(f"Source and destination refer to the same file: {src}")
-        if dst.is_symlink():
-            raise ConfigError(f"Symlink destination is not supported: {dst}")
+        if is_link_like(dst):
+            raise ConfigError(f"Symbolic-link or junction destination is not supported: {dst}")
         self._path(str(dst))
         if dst.exists() and dst.is_dir():
             raise ConfigError(f"Destination is a directory: {dst}")
@@ -170,8 +192,8 @@ class Engine:
 
         handled = 0
         for path in sorted(self.input_dir.iterdir()):
-            if path.is_symlink():
-                print(f"SKIP symlink source: {path}")
+            if is_link_like(path):
+                print(f"SKIP symbolic-link or junction source: {path}")
                 continue
             if not path.is_file():
                 continue

@@ -1,4 +1,6 @@
 """Usability regressions without opening Windows or touching real files."""
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,6 +72,31 @@ class ConsumerUIHelpersTests(unittest.TestCase):
                     app.choose_child_folder(target)
                     target.set.assert_not_called()
                     warning.assert_called_once()
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_child_picker_rejects_junction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            real = parent / "real"
+            junction = parent / "junction"
+            real.mkdir()
+            result = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(junction), str(real)],
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                self.skipTest(f"junction creation unavailable: {result.stderr.strip()}")
+            try:
+                app = self._app(parent)
+                target = Mock()
+                with patch("folder_desktop_app.filedialog.askdirectory", return_value=str(junction)), \
+                     patch("folder_desktop_app.messagebox.showwarning") as warning:
+                    app.choose_child_folder(target)
+                target.set.assert_not_called()
+                warning.assert_called_once()
+            finally:
+                if junction.exists():
+                    junction.rmdir()
 
     def test_field_edit_revokes_old_preview_and_does_not_touch_files(self):
         app = FolderDesktop.__new__(FolderDesktop)

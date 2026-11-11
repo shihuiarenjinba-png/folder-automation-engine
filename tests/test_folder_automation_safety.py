@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +25,48 @@ def make_engine(root: Path, *, destination: str = "processed", action: str = "mo
 
 
 class FolderAutomationSafetyTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_input_and_destination_junctions_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inbox = root / "inbox"
+            real_input = root / "real-input"
+            real_output = root / "real-output"
+            inbox.mkdir()
+            real_input.mkdir()
+            real_output.mkdir()
+
+            input_link = root / "input-junction"
+            output_link = root / "output-junction"
+            created: list[Path] = []
+            try:
+                for link, target in ((input_link, real_input), (output_link, real_output)):
+                    result = subprocess.run(
+                        ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                        capture_output=True, text=True,
+                    )
+                    if result.returncode != 0:
+                        self.skipTest(f"junction creation unavailable: {result.stderr.strip()}")
+                    created.append(link)
+
+                with self.assertRaisesRegex(ConfigError, "junction"):
+                    Engine({
+                        "root_dir": str(root), "input_dir": "input-junction",
+                        "rules": [{"glob": "*.txt", "action": "copy",
+                                   "destination": "processed"}],
+                    }, dry_run=True)
+
+                (inbox / "a.txt").write_text("safe", encoding="utf-8")
+                engine = make_engine(root, destination="output-junction", dry_run=True)
+                with self.assertRaisesRegex(ConfigError, "junction"):
+                    engine.scan_once()
+                self.assertEqual((inbox / "a.txt").read_text(encoding="utf-8"), "safe")
+                self.assertEqual(list(real_output.iterdir()), [])
+            finally:
+                for link in reversed(created):
+                    if link.exists():
+                        link.rmdir()
+
     def test_collision_remains_unprocessed_and_retries_when_freed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
