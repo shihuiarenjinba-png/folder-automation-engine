@@ -12,11 +12,13 @@ Use this order. A later step cannot turn an earlier FAIL into PASS.
 6. **Commercial metadata** — owner approves JP/EN listing, price, markets, age rating answers, privacy text/URL as required by the live form, support contact and legal terms.
 7. **Optional WACK precheck** — run on the exact candidate when a valid environment is available. Record result. Official Store certification remains the authoritative certification step.
 8. **Build submission bundle** — fill `store/SUBMISSION_AUTOMATION_TEST_INPUT_DRAFT_20261026.json` with exact final paths/hashes/evidence. Never invent missing answers.
-9. **Fail-closed validation** — run `python qa/validate_store_submission_bundle.py <bundle.json> --require-ready`. It must output `STORE_UPLOAD_READY` with an empty missing list.
-10. **Automatic uploader test** — `VALIDATE_ONLY` then non-mutating `DRY_RUN`.
+9. **Fail-closed validation for the first Store test** — set Audience = `PRIVATE_AUDIENCE_TEST`, known-user group, manual publishing hold and approved 1366×768+ actual-app listing candidate images. Run `python qa/validate_store_submission_bundle.py <bundle.json> --require-ready`. It must output `PRIVATE_AUDIENCE_UPLOAD_READY` with an empty missing list.
+10. **Automatic uploader test** — `VALIDATE_ONLY` then non-mutating `DRY_RUN` for the existing product and Private audience.
 11. **Owner upload approval** — only after the above evidence is reviewed.
-12. **Upload package** — upload only; keep certification submission and publication disabled/held.
+12. **Upload package** — upload the exact MSIX to the Private audience draft only; keep certification submission and public publication as separate approvals.
 13. **Certification approval** — separate owner approval.
-14. **Publish approval** — only after certification success and final Store-side inspection.
+14. **Store-signed install QA** — after certification/signing and Private audience availability, install from Microsoft Store with the approved personal Microsoft account; verify launch, JP/EN, file operations, LocalState, update/uninstall and capture final screenshots.
+15. **Public-release validator** — switch the bundle to `PUBLIC_RELEASE`; require Store-signed install QA and final genuine screenshots. It must output `PUBLIC_STORE_UPLOAD_READY`.
+16. **Publish approval** — only after certification success, Store-signed install QA and final Store-side inspection.
 
 **The product is a completed engineering candidate only when steps 1–8 are materially complete. It becomes STORE_UPLOAD_READY only at step 9 plus owner upload approval.**
