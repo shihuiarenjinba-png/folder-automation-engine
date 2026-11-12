@@ -19,7 +19,7 @@ jobs:
       - name: Validate PowerShell build script syntax
         shell: powershell
         run: |
-          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1", "qa/folder-desktop-gui-smoke.ps1")) {
+          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1", "qa/folder-desktop-gui-smoke.ps1", "qa/run-wack-preflight.ps1")) {
             $tokens = $null
             $parseErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
