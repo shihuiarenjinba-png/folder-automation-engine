@@ -43,6 +43,21 @@ def evaluate(data: dict[str, Any]) -> tuple[str, list[str]]:
     proof = data.get("proof") or {}
     permissions = data.get("permissions") or {}
     guards = data.get("guards") or {}
+    distribution = data.get("distribution") or {}
+
+    audience = distribution.get("audience")
+    if audience not in {"PRIVATE_AUDIENCE_TEST", "PUBLIC_RELEASE"}:
+        missing.append("distribution.audience")
+    if distribution.get("publishing_hold") != "MANUAL":
+        missing.append("distribution.publishing_hold")
+    if audience == "PRIVATE_AUDIENCE_TEST":
+        if not _present(distribution.get("known_user_group")):
+            missing.append("distribution.known_user_group")
+        if distribution.get("public_release_approved") is not False:
+            missing.append("distribution.public_release_approved_must_be_false")
+    elif audience == "PUBLIC_RELEASE":
+        if distribution.get("public_release_approved") is not True:
+            missing.append("distribution.public_release_approved")
 
     for guard in (
         "fail_closed_on_identity_mismatch", "fail_closed_on_sha_mismatch",
@@ -85,6 +100,8 @@ def evaluate(data: dict[str, Any]) -> tuple[str, list[str]]:
         "proof.third_party_notices_approved": proof.get("third_party_notices_approved") is True,
         "proof.all_screenshots_genuine": proof.get("all_screenshots_genuine") is True,
         "permissions.owner_upload_approval": permissions.get("owner_upload_approval") is True,
+        "distribution.audience": audience,
+        "distribution.publishing_hold": distribution.get("publishing_hold"),
     }
     readiness_missing = [key for key, value in ready_requirements.items() if not _present(value)]
 
