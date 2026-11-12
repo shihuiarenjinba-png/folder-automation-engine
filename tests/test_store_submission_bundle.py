@@ -35,6 +35,12 @@ def ready_bundle():
             "owner_upload_approval": True, "upload_package": True,
             "submit_certification": False, "publish": False,
         },
+        "distribution": {
+            "audience": "PRIVATE_AUDIENCE_TEST",
+            "known_user_group": "owner-local-testers",
+            "publishing_hold": "MANUAL",
+            "public_release_approved": False,
+        },
         "guards": {
             "fail_closed_on_identity_mismatch": True, "fail_closed_on_sha_mismatch": True,
             "fail_closed_on_missing_proof": True, "forbid_duplicate_product": True,
@@ -76,6 +82,27 @@ class StoreSubmissionBundleTests(unittest.TestCase):
                 state, missing = evaluate(data)
                 self.assertEqual(state, "HOLD")
                 self.assertIn("write_phase_too_broad_for_upload_gate", missing)
+
+    def test_private_audience_requires_known_user_group(self):
+        data = ready_bundle()
+        data["distribution"]["known_user_group"] = None
+        state, missing = evaluate(data)
+        self.assertEqual(state, "HOLD")
+        self.assertIn("distribution.known_user_group", missing)
+
+    def test_private_audience_cannot_be_marked_public_release(self):
+        data = ready_bundle()
+        data["distribution"]["public_release_approved"] = True
+        state, missing = evaluate(data)
+        self.assertEqual(state, "HOLD")
+        self.assertIn("distribution.public_release_approved_must_be_false", missing)
+
+    def test_manual_publishing_hold_is_required(self):
+        data = ready_bundle()
+        data["distribution"]["publishing_hold"] = "AUTO"
+        state, missing = evaluate(data)
+        self.assertEqual(state, "HOLD")
+        self.assertIn("distribution.publishing_hold", missing)
 
     def test_bad_sha_format_is_rejected(self):
         data = ready_bundle()
