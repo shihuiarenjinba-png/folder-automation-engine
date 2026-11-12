@@ -28,6 +28,13 @@ if (-not (Test-Path -LiteralPath $payload -PathType Container)) { throw "Missing
 $sourceExe = Join-Path $payload "FolderAutomationEngine.exe"
 if (-not (Test-Path -LiteralPath $sourceExe -PathType Leaf)) { throw "Payload EXE missing: $sourceExe" }
 if (-not (Test-Path -LiteralPath (Join-Path $payload "_internal") -PathType Container)) { throw "PyInstaller onedir runtime is missing" }
+$notices = Join-Path $payload "THIRD_PARTY_NOTICES"
+if (-not (Test-Path -LiteralPath $notices -PathType Container)) { throw "Packaged third-party notices are missing" }
+foreach ($requiredNotice in @("THIRD_PARTY_NOTICES.md", "BUILD_COMPONENT_VERSIONS.json")) {
+    if (-not (Test-Path -LiteralPath (Join-Path $notices $requiredNotice) -PathType Leaf)) {
+        throw "Required third-party notice evidence missing: $requiredNotice"
+    }
+}
 $out = if ([IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $repoRoot $OutputDirectory }
 if (Test-Path -LiteralPath $out) { throw "Output already exists: $out" }
 New-Item -ItemType Directory -Path $out | Out-Null
@@ -45,13 +52,26 @@ $manifestPath = Join-Path $stage "AppxManifest.xml"
 Add-Type -AssemblyName System.Drawing
 foreach ($size in @(44,50,150)) {
     $name = switch ($size) { 44 { "Square44x44Logo.png" }; 50 { "StoreLogo.png" }; 150 { "Square150x150Logo.png" } }
-    $bitmap=[Drawing.Bitmap]::new($size,$size); $graphics=[Drawing.Graphics]::FromImage($bitmap)
+    $bitmap=[Drawing.Bitmap]::new($size,$size)
+    $graphics=[Drawing.Graphics]::FromImage($bitmap)
     try {
-        $graphics.Clear([Drawing.Color]::FromArgb(18,42,66)); $font=[Drawing.Font]::new("Segoe UI",[single]($size*.32),[Drawing.FontStyle]::Bold,[Drawing.GraphicsUnit]::Pixel)
-        $brush=[Drawing.SolidBrush]::new([Drawing.Color]::White); $format=[Drawing.StringFormat]::new()
-        try { $format.Alignment=[Drawing.StringAlignment]::Center; $format.LineAlignment=[Drawing.StringAlignment]::Center; $graphics.DrawString("FA",$font,$brush,[Drawing.RectangleF]::new(0,0,[single]$size,[single]$size),$format); $bitmap.Save((Join-Path $stage ("Assets\"+$name)),[Drawing.Imaging.ImageFormat]::Png) }
-        finally { $format.Dispose();$brush.Dispose();$font.Dispose() }
-    } finally { $graphics.Dispose();$bitmap.Dispose() }
+        $graphics.SmoothingMode=[Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $graphics.Clear([Drawing.Color]::FromArgb(18,42,66))
+        $folderBrush=[Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(46,150,220))
+        $arrowPen=[Drawing.Pen]::new([Drawing.Color]::White,[single]([Math]::Max(2,$size*.08)))
+        try {
+            $folder=[Drawing.RectangleF]::new([single]($size*.16),[single]($size*.34),[single]($size*.68),[single]($size*.43))
+            $tab=[Drawing.RectangleF]::new([single]($size*.20),[single]($size*.24),[single]($size*.28),[single]($size*.18))
+            $graphics.FillRectangle($folderBrush,$folder)
+            $graphics.FillRectangle($folderBrush,$tab)
+            $arrowPen.StartCap=[Drawing.Drawing2D.LineCap]::Round
+            $arrowPen.EndCap=[Drawing.Drawing2D.LineCap]::Round
+            $graphics.DrawLine($arrowPen,[single]($size*.34),[single]($size*.56),[single]($size*.67),[single]($size*.56))
+            $graphics.DrawLine($arrowPen,[single]($size*.57),[single]($size*.46),[single]($size*.67),[single]($size*.56))
+            $graphics.DrawLine($arrowPen,[single]($size*.57),[single]($size*.66),[single]($size*.67),[single]($size*.56))
+            $bitmap.Save((Join-Path $stage ("Assets\"+$name)),[Drawing.Imaging.ImageFormat]::Png)
+        } finally { $arrowPen.Dispose(); $folderBrush.Dispose() }
+    } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
 function Assert-Manifest([string]$Path) {
     [xml]$xml=Get-Content -LiteralPath $Path -Raw -Encoding UTF8; $ns=[Xml.XmlNamespaceManager]::new($xml.NameTable); $ns.AddNamespace("f","http://schemas.microsoft.com/appx/manifest/foundation/windows10")
@@ -62,6 +82,22 @@ function Assert-Manifest([string]$Path) {
     if (-not $xml.SelectSingleNode("/f:Package/f:Capabilities/*[local-name()='Capability' and @Name='runFullTrust']",$ns)) { throw "Missing full-trust capability" }
 }
 Assert-Manifest $manifestPath
+$inventory = @(
+    Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+        [ordered]@{
+            path = $_.FullName.Substring($stage.Length + 1).Replace("\\","/")
+            size = $_.Length
+            sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+)
+$inventoryFile = Join-Path $out "package_file_inventory.json"
+[ordered]@{
+    source_commit = $sourceCommit
+    version = $Version
+    file_count = $inventory.Count
+    files = $inventory
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $inventoryFile -Encoding UTF8
 $kit=Join-Path ([Environment]::GetEnvironmentVariable("ProgramFiles(x86)")) "Windows Kits\10\bin"
 $makeappx=Get-ChildItem -LiteralPath $kit -Recurse -Filter MakeAppx.exe -File -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName -match '\\x64$' } | Sort-Object FullName -Descending | Select-Object -First 1
 if ($null -eq $makeappx) { throw "x64 MakeAppx.exe not installed" }
@@ -74,7 +110,8 @@ Assert-Manifest (Join-Path $unpack "AppxManifest.xml")
 $sourceSha=(Get-FileHash -Algorithm SHA256 -LiteralPath $sourceExe).Hash.ToLowerInvariant(); $unpackedSha=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $unpack "FolderAutomationEngine.exe")).Hash.ToLowerInvariant()
 if ($sourceSha -cne $unpackedSha -or -not (Test-Path -LiteralPath (Join-Path $unpack "_internal") -PathType Container)) { throw "MSIX onedir payload changed after pack/unpack" }
 $packageSha=(Get-FileHash -Algorithm SHA256 -LiteralPath $msix).Hash.ToLowerInvariant()
-$report=[ordered]@{ msix_package_version_status=[string]$identity.msix_package_version_status; previous_store_accepted_version=$identity.previous_store_accepted_version; store_version_history_verified=[bool]$identity.store_version_history_verified; store_submission_allowed=[bool]$identity.submission_allowed; store_id=[string]$identity.store_id; identity_name=[string]$identity.package_identity_name; identity_publisher=[string]$identity.publisher; msix_file=$msixName; msix_version=$Version; source_commit=$sourceCommit; source_exe_sha256=$sourceSha; unpacked_exe_sha256=$unpackedSha; msix_sha256=$packageSha; onedir_runtime_verified=$true; manifest_identity_verified=$true; makeappx_pack_unpack="PASS"; signed=$false; approved_logo=$false; symlink_safety_tests_complete=$false; manual_windows_acceptance=$false; store_submission_approved=$false; sale_approved=$false }
+$report=[ordered]@{ msix_package_version_status=[string]$identity.msix_package_version_status; previous_store_accepted_version=$identity.previous_store_accepted_version; store_version_history_verified=[bool]$identity.store_version_history_verified; store_submission_allowed=[bool]$identity.submission_allowed; store_id=[string]$identity.store_id; identity_name=[string]$identity.package_identity_name; identity_publisher=[string]$identity.publisher; msix_file=$msixName; msix_version=$Version; source_commit=$sourceCommit; source_exe_sha256=$sourceSha; unpacked_exe_sha256=$unpackedSha; msix_sha256=$packageSha; onedir_runtime_verified=$true; manifest_identity_verified=$true; makeappx_pack_unpack="PASS"; third_party_notices_verified=$true; package_inventory_file="package_file_inventory.json"; package_inventory_count=$inventory.Count; artwork_origin="GENERATED_IN_REPOSITORY_NO_EXTERNAL_ASSET"; signed=$false; approved_logo=$false; symlink_safety_tests_complete=$false; manual_windows_acceptance=$false; store_submission_approved=$false; sale_approved=$false }
 $report | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $out "msix_validation.json") -Encoding UTF8
 "$packageSha  $msixName" | Set-Content -LiteralPath (Join-Path $out "msix.sha256.txt") -Encoding ASCII
-Write-Host "Validated UNSIGNED draft MSIX: $msix"; Write-Warning "Technical review only: temporary icons, unsigned, three symlink tests remain unverified, not approved for sale."
+Write-Host "Validated UNSIGNED draft MSIX: $msix"
+Write-Warning "Technical review only: unsigned; final owner artwork approval, manual Windows acceptance and live Partner Center checks remain required."
