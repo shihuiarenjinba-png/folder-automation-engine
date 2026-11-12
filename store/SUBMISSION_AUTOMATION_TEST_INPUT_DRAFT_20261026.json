@@ -58,7 +58,10 @@
     "all_screenshots_genuine": false,
     "wack_status": "OPTIONAL_PRECHECK_PENDING",
     "package_inventory_verified": false,
-    "third_party_notices_packaged": false
+    "third_party_notices_packaged": false,
+    "pre_store_ci_gui_pass": false,
+    "private_audience_listing_screenshots_approved": false,
+    "store_signed_install_qa_pass": false
   },
   "permissions": {
     "validate_only": true,
@@ -82,12 +85,13 @@
     "require_store_upload_validator_pass": true
   },
   "notes": [
-    "First Store installation test should use Private audience. Do not sideload this unsigned Store candidate.",
+    "First Store installation test uses Private audience. The private-audience upload gate does not require Store-signed install QA because that QA becomes possible only after certification.",
+    "Private-audience upload requires exact-head CI GUI PASS and owner-approved 1366x768+ actual-app listing candidate screenshots.",
+    "After Store certification/signing, install from Store as an approved tester and complete store_signed_install_qa_pass before any PUBLIC_RELEASE gate can pass.",
     "Private-audience testers must be specified explicitly using a personal Microsoft account group; never invent tester identities.",
     "Keep publishing hold MANUAL. Private audience distribution is not public release.",
     "Validate this file with qa/validate_store_submission_bundle.py before any upload-capable automation.",
-    "Do not invent version, price, market, age rating, legal answers, screenshots, support or privacy values.",
-    "VALIDATE_ONLY and DRY_RUN must not mutate Partner Center. Upload, certification submission and Publish are separate owner approvals."
+    "Upload, certification submission and Publish remain separate owner approvals."
   ],
   "distribution": {
     "audience": "PRIVATE_AUDIENCE_TEST",
