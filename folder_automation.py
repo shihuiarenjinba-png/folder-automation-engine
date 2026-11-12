@@ -19,6 +19,33 @@ class ConfigError(RuntimeError):
     pass
 
 
+def is_link_like(path: Path) -> bool:
+    """Return True for symbolic links and Windows directory junctions."""
+    junction_check = getattr(path, "is_junction", None)
+    return path.is_symlink() or bool(junction_check and junction_check())
+
+
+def first_link_like_component(path: Path) -> Path | None:
+    """Find a symlink/junction in an absolute path *before* resolving it."""
+    current = Path(os.path.abspath(path))
+    while True:
+        if is_link_like(current):
+            return current
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+
+
+def require_plain_path(path: Path, label: str) -> Path:
+    """Reject any lexical ancestor that redirects through a symlink/junction."""
+    absolute = Path(os.path.abspath(path))
+    redirected = first_link_like_component(absolute)
+    if redirected is not None:
+        raise ConfigError(f"{label} contains a symbolic-link or junction component: {redirected}")
+    return absolute
+
+
 class RuleResult(str, Enum):
     NO_MATCH = "no_match"
     HANDLED = "handled"
@@ -29,7 +56,9 @@ class Engine:
     def __init__(self, config: dict[str, Any], dry_run: bool = False) -> None:
         self.config = config
         self.dry_run = dry_run
-        self.root = Path(config.get("root_dir", ".")).expanduser().resolve()
+        root_path = Path(config.get("root_dir", ".")).expanduser()
+        self.root_input = require_plain_path(root_path, "root_dir")
+        self.root = self.root_input.resolve()
         self.input_dir = self._path(config.get("input_dir", "inbox"))
         self.interval = max(float(config.get("poll_seconds", 5)), 1.0)
         self.rules = config.get("rules", [])
@@ -44,8 +73,11 @@ class Engine:
     def _path(self, value: str) -> Path:
         path = Path(value).expanduser()
         if not path.is_absolute():
-            path = self.root / path
-        path = path.resolve()
+            path = self.root_input / path
+        # Keep lexical path components visible until all redirecting components
+        # have been rejected. This also catches a junction above root_dir.
+        unresolved = require_plain_path(path, "path")
+        path = unresolved.resolve()
         try:
             path.relative_to(self.root)
         except ValueError as exc:
@@ -136,8 +168,8 @@ class Engine:
         # overwrite=true. Resolving also prevents a symlink from escaping root.
         if src.resolve() == dst.resolve() or (dst.exists() and src.samefile(dst)):
             raise ConfigError(f"Source and destination refer to the same file: {src}")
-        if dst.is_symlink():
-            raise ConfigError(f"Symlink destination is not supported: {dst}")
+        if is_link_like(dst):
+            raise ConfigError(f"Symbolic-link or junction destination is not supported: {dst}")
         self._path(str(dst))
         if dst.exists() and dst.is_dir():
             raise ConfigError(f"Destination is a directory: {dst}")
@@ -170,8 +202,8 @@ class Engine:
 
         handled = 0
         for path in sorted(self.input_dir.iterdir()):
-            if path.is_symlink():
-                print(f"SKIP symlink source: {path}")
+            if is_link_like(path):
+                print(f"SKIP symbolic-link or junction source: {path}")
                 continue
             if not path.is_file():
                 continue
