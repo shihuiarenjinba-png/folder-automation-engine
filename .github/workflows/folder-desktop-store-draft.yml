@@ -80,6 +80,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $inventoryFile -PathType Leaf)) { throw "Package file inventory missing" }
           $inventory = Get-Content -LiteralPath $inventoryFile -Raw | ConvertFrom-Json
           if ($inventory.source_commit -cne $actualCommit -or [int]$inventory.file_count -ne [int]$report.package_inventory_count) { throw "Package inventory provenance mismatch" }
+          python qa/verify_msix_inventory.py $msixFile $inventoryFile
+          if ($LASTEXITCODE -ne 0) { throw "MSIX file inventory verification failed" }
           $shaFile = Join-Path $outputDir "msix.sha256.txt"
           if (-not (Test-Path -LiteralPath $shaFile -PathType Leaf)) { throw "MSIX checksum file missing" }
           $recordedHashLine = (Get-Content -LiteralPath $shaFile -Raw).Trim()
