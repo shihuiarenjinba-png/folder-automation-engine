@@ -1,6 +1,6 @@
 {
-  "contract": "folder-standard-store-submission-smoke-v1",
-  "purpose": "VALIDATE_ONLY input example; not permission to alter Partner Center",
+  "contract": "folder-standard-store-submission-smoke-v2",
+  "purpose": "VALIDATE_ONLY template for the fail-closed Store upload validator; never grants Partner Center mutation",
   "mode": "VALIDATE_ONLY",
   "product": {
     "kind": "app",
@@ -19,7 +19,9 @@
     "format": "msix",
     "signed_by_store": false,
     "verified_by_operator": false,
-    "msix_version": null
+    "msix_version": null,
+    "inventory_path": null,
+    "third_party_notices_path": null
   },
   "store": {
     "existing_product_id_recorded": "9P99MJX1R4V6",
@@ -53,7 +55,10 @@
     "symlink_junction_qa_complete": false,
     "wack_accepted": false,
     "third_party_notices_approved": false,
-    "all_screenshots_genuine": false
+    "all_screenshots_genuine": false,
+    "wack_status": "OPTIONAL_PRECHECK_PENDING",
+    "package_inventory_verified": false,
+    "third_party_notices_packaged": false
   },
   "permissions": {
     "validate_only": true,
@@ -73,12 +78,14 @@
     "forbid_duplicate_product": true,
     "do_not_invent_question_answers": true,
     "do_not_skip_certification_fields": true,
-    "require_manual_approval_for_each_write_phase": true
+    "require_manual_approval_for_each_write_phase": true,
+    "require_store_upload_validator_pass": true
   },
   "notes": [
-    "This is a proposal for the submission automation script's input adapter; inspect and adapt to its actual existing schema.",
-    "Do not invent a version, price, location, assets or legal answers.",
-    "Prefer validate-only and dry-run tests before any Partner Center mutation.",
-    "A successful form dry-run or CI build cannot grant STORE_UPLOAD_READY."
+    "Validate this file with qa/validate_store_submission_bundle.py before any upload-capable automation.",
+    "Do not invent version, price, market, age rating, legal answers, screenshots, support or privacy values.",
+    "The final MSIX build emits package_file_inventory.json and packaged THIRD_PARTY_NOTICES evidence.",
+    "WACK is tracked as an optional local pre-submission check; official Store certification remains authoritative.",
+    "VALIDATE_ONLY and DRY_RUN must not mutate Partner Center. Upload, certification submission and publish are separate owner approvals."
   ]
 }
