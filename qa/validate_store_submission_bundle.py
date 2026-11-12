@@ -94,15 +94,25 @@ def evaluate(data: dict[str, Any]) -> tuple[str, list[str]]:
         "listing.en.screenshots": (listing.get("en") or {}).get("screenshots"),
         "listing.final_logo": listing.get("final_logo"),
         "listing.owner_approved": listing.get("owner_approved") is True,
-        "proof.windows_user_gui_qa_pass": proof.get("windows_user_gui_qa_pass") is True,
         "proof.filesystem_safety_qa_pass": proof.get("filesystem_safety_qa_pass") is True,
         "proof.symlink_junction_qa_complete": proof.get("symlink_junction_qa_complete") is True,
         "proof.third_party_notices_approved": proof.get("third_party_notices_approved") is True,
-        "proof.all_screenshots_genuine": proof.get("all_screenshots_genuine") is True,
         "permissions.owner_upload_approval": permissions.get("owner_upload_approval") is True,
         "distribution.audience": audience,
         "distribution.publishing_hold": distribution.get("publishing_hold"),
     }
+    if audience == "PRIVATE_AUDIENCE_TEST":
+        ready_requirements.update({
+            "proof.pre_store_ci_gui_pass": proof.get("pre_store_ci_gui_pass") is True,
+            "proof.private_audience_listing_screenshots_approved":
+                proof.get("private_audience_listing_screenshots_approved") is True,
+        })
+    elif audience == "PUBLIC_RELEASE":
+        ready_requirements.update({
+            "proof.windows_user_gui_qa_pass": proof.get("windows_user_gui_qa_pass") is True,
+            "proof.store_signed_install_qa_pass": proof.get("store_signed_install_qa_pass") is True,
+            "proof.all_screenshots_genuine": proof.get("all_screenshots_genuine") is True,
+        })
     readiness_missing = [key for key, value in ready_requirements.items() if not _present(value)]
 
     if permissions.get("submit_certification") or permissions.get("publish"):
@@ -111,7 +121,12 @@ def evaluate(data: dict[str, Any]) -> tuple[str, list[str]]:
         missing.append("upload_without_owner_approval")
 
     missing.extend(readiness_missing)
-    state = "STORE_UPLOAD_READY" if not missing else "HOLD"
+    if missing:
+        state = "HOLD"
+    elif audience == "PRIVATE_AUDIENCE_TEST":
+        state = "PRIVATE_AUDIENCE_UPLOAD_READY"
+    else:
+        state = "PUBLIC_STORE_UPLOAD_READY"
     return state, sorted(set(missing))
 
 
@@ -123,7 +138,7 @@ def main() -> int:
     data = json.loads(args.bundle.read_text(encoding="utf-8"))
     state, missing = evaluate(data)
     print(json.dumps({"state": state, "missing": missing}, ensure_ascii=False, indent=2))
-    if args.require_ready and state != "STORE_UPLOAD_READY":
+    if args.require_ready and state not in {"PRIVATE_AUDIENCE_UPLOAD_READY", "PUBLIC_STORE_UPLOAD_READY"}:
         return 2
     return 0
 
