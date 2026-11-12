@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path, PureWindowsPath
 
-from folder_automation import ConfigError, is_link_like
+from folder_automation import ConfigError, is_link_like, require_plain_path
 
 
 def _child_name(value: str, label: str) -> str:
@@ -34,8 +34,10 @@ def build_config(
     if not root_text:
         raise ConfigError("Select the main folder / ルートフォルダーを選択してください")
     root_path = Path(root_text).expanduser()
-    if is_link_like(root_path):
-        raise ConfigError("Selected root cannot be a symbolic link or junction / 親フォルダーにリンクは利用できません")
+    try:
+        root_path = require_plain_path(root_path, "root_dir")
+    except ConfigError as exc:
+        raise ConfigError("Selected root cannot contain a symbolic link or junction / 親フォルダーの経路にリンクは利用できません") from exc
     root = root_path.resolve()
     if not root.is_dir():
         raise ConfigError("Selected root must be an existing directory / 存在するフォルダーを選択してください")
