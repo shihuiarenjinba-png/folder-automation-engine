@@ -36,6 +36,8 @@ public static class FolderStoreCapture {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll", SetLastError=true)]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int X, int Y, int cx, int cy, uint flags);
+    [DllImport("user32.dll", SetLastError=true)]
+    public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
 }
 '@
 
@@ -75,10 +77,18 @@ try {
             if ($width -lt 720 -or $height -lt 570) { throw "Actual app window is below product QA minimum: ${width}x${height}" }
             $file=Join-Path $evidence ("folder-automation-engine-store-"+$case.code+".png")
             $sourceBitmap=New-Object Drawing.Bitmap($width,$height)
+            $printWindowOk=$false
             try {
                 $sourceGraphics=[Drawing.Graphics]::FromImage($sourceBitmap)
-                try { $sourceGraphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$sourceBitmap.Size) }
-                finally { $sourceGraphics.Dispose() }
+                $hdc=[IntPtr]::Zero
+                try {
+                    $hdc=$sourceGraphics.GetHdc()
+                    $printWindowOk=[FolderStoreCapture]::PrintWindow($process.MainWindowHandle,$hdc,2)
+                } finally {
+                    if ($hdc -ne [IntPtr]::Zero) { $sourceGraphics.ReleaseHdc($hdc) }
+                    $sourceGraphics.Dispose()
+                }
+                if (-not $printWindowOk) { throw "PrintWindow failed for $($case.code)" }
 
                 $scale=[Math]::Max(1.0,[Math]::Max(1366.0/$width,768.0/$height))
                 $outputWidth=[int][Math]::Ceiling($width*$scale)
@@ -111,6 +121,9 @@ try {
                 output_height=$outputHeight
                 resized_for_store_minimum=$resized
                 resize_method=if ($resized) { "HighQualityBicubic" } else { "none" }
+                capture_method="PrintWindow(PW_RENDERFULLCONTENT)"
+                print_window_success=$printWindowOk
+                desktop_or_taskbar_capture_expected=$false
                 actual_application_window=$true
                 private_audience_listing_candidate=$true
                 human_approved=$false
