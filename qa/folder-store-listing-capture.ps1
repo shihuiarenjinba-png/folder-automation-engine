@@ -72,22 +72,45 @@ try {
             $rect=New-Object FolderStoreCapture+RECT
             if (-not [FolderStoreCapture]::GetWindowRect($process.MainWindowHandle,[ref]$rect)) { throw "GetWindowRect failed" }
             $width=$rect.Right-$rect.Left; $height=$rect.Bottom-$rect.Top
-            if ($width -lt 1366 -or $height -lt 768) { throw "Store capture below 1366x768: ${width}x${height}" }
+            if ($width -lt 720 -or $height -lt 570) { throw "Actual app window is below product QA minimum: ${width}x${height}" }
             $file=Join-Path $evidence ("folder-automation-engine-store-"+$case.code+".png")
-            $bitmap=New-Object Drawing.Bitmap($width,$height)
+            $sourceBitmap=New-Object Drawing.Bitmap($width,$height)
             try {
-                $graphics=[Drawing.Graphics]::FromImage($bitmap)
-                try { $graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$bitmap.Size) }
-                finally { $graphics.Dispose() }
-                $bitmap.Save($file,[Drawing.Imaging.ImageFormat]::Png)
-            } finally { $bitmap.Dispose() }
+                $sourceGraphics=[Drawing.Graphics]::FromImage($sourceBitmap)
+                try { $sourceGraphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$sourceBitmap.Size) }
+                finally { $sourceGraphics.Dispose() }
+
+                $scale=[Math]::Max(1.0,[Math]::Max(1366.0/$width,768.0/$height))
+                $outputWidth=[int][Math]::Ceiling($width*$scale)
+                $outputHeight=[int][Math]::Ceiling($height*$scale)
+                $resized=($outputWidth -ne $width -or $outputHeight -ne $height)
+                if ($resized) {
+                    $outputBitmap=New-Object Drawing.Bitmap($outputWidth,$outputHeight)
+                    try {
+                        $outputGraphics=[Drawing.Graphics]::FromImage($outputBitmap)
+                        try {
+                            $outputGraphics.InterpolationMode=[Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                            $outputGraphics.PixelOffsetMode=[Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                            $outputGraphics.DrawImage($sourceBitmap,0,0,$outputWidth,$outputHeight)
+                        } finally { $outputGraphics.Dispose() }
+                        $outputBitmap.Save($file,[Drawing.Imaging.ImageFormat]::Png)
+                    } finally { $outputBitmap.Dispose() }
+                } else {
+                    $sourceBitmap.Save($file,[Drawing.Imaging.ImageFormat]::Png)
+                }
+            } finally { $sourceBitmap.Dispose() }
+            if ($outputWidth -lt 1366 -or $outputHeight -lt 768) { throw "Store candidate output below 1366x768" }
             $hash=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
             $results += [ordered]@{
                 language=$case.locale
                 file=[IO.Path]::GetFileName($file)
                 sha256=$hash
-                width=$width
-                height=$height
+                source_width=$width
+                source_height=$height
+                output_width=$outputWidth
+                output_height=$outputHeight
+                resized_for_store_minimum=$resized
+                resize_method=if ($resized) { "HighQualityBicubic" } else { "none" }
                 actual_application_window=$true
                 private_audience_listing_candidate=$true
                 human_approved=$false
