@@ -16,6 +16,11 @@ on:
       - "tests/test_folder_config_reload.py"
       - "tests/test_folder_consumer_ui.py"
       - "tests/test_ui_preferences.py"
+      - "tests/test_store_*.py"
+      - "tests/test_msix_*.py"
+      - "tests/test_local_*.py"
+      - "qa/verify_*.py"
+      - "store/*.json"
       - ".github/workflows/folder-gui-tests.yml"
   workflow_dispatch:
 
