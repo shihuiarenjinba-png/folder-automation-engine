@@ -25,6 +25,27 @@ def is_link_like(path: Path) -> bool:
     return path.is_symlink() or bool(junction_check and junction_check())
 
 
+def first_link_like_component(path: Path) -> Path | None:
+    """Find a symlink/junction in an absolute path *before* resolving it."""
+    current = Path(os.path.abspath(path))
+    while True:
+        if is_link_like(current):
+            return current
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+
+
+def require_plain_path(path: Path, label: str) -> Path:
+    """Reject any lexical ancestor that redirects through a symlink/junction."""
+    absolute = Path(os.path.abspath(path))
+    redirected = first_link_like_component(absolute)
+    if redirected is not None:
+        raise ConfigError(f"{label} contains a symbolic-link or junction component: {redirected}")
+    return absolute
+
+
 class RuleResult(str, Enum):
     NO_MATCH = "no_match"
     HANDLED = "handled"
@@ -36,9 +57,8 @@ class Engine:
         self.config = config
         self.dry_run = dry_run
         root_path = Path(config.get("root_dir", ".")).expanduser()
-        if is_link_like(root_path):
-            raise ConfigError(f"Symbolic-link or junction root is not supported: {root_path}")
-        self.root = root_path.resolve()
+        self.root_input = require_plain_path(root_path, "root_dir")
+        self.root = self.root_input.resolve()
         self.input_dir = self._path(config.get("input_dir", "inbox"))
         self.interval = max(float(config.get("poll_seconds", 5)), 1.0)
         self.rules = config.get("rules", [])
@@ -53,20 +73,10 @@ class Engine:
     def _path(self, value: str) -> Path:
         path = Path(value).expanduser()
         if not path.is_absolute():
-            path = self.root / path
-        # Inspect the unresolved path first. Calling resolve() before this check
-        # would hide a Windows junction or symbolic-link component.
-        unresolved = Path(os.path.abspath(path))
-        current = unresolved
-        while True:
-            if is_link_like(current):
-                raise ConfigError(f"Symbolic-link or junction path is not supported: {current}")
-            if current == self.root:
-                break
-            parent = current.parent
-            if parent == current:
-                break
-            current = parent
+            path = self.root_input / path
+        # Keep lexical path components visible until all redirecting components
+        # have been rejected. This also catches a junction above root_dir.
+        unresolved = require_plain_path(path, "path")
         path = unresolved.resolve()
         try:
             path.relative_to(self.root)
