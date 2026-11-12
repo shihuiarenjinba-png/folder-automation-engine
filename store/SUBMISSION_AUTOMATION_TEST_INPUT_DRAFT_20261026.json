@@ -82,10 +82,19 @@
     "require_store_upload_validator_pass": true
   },
   "notes": [
+    "First Store installation test should use Private audience. Do not sideload this unsigned Store candidate.",
+    "Private-audience testers must be specified explicitly using a personal Microsoft account group; never invent tester identities.",
+    "Keep publishing hold MANUAL. Private audience distribution is not public release.",
     "Validate this file with qa/validate_store_submission_bundle.py before any upload-capable automation.",
     "Do not invent version, price, market, age rating, legal answers, screenshots, support or privacy values.",
-    "The final MSIX build emits package_file_inventory.json and packaged THIRD_PARTY_NOTICES evidence.",
-    "WACK is tracked as an optional local pre-submission check; official Store certification remains authoritative.",
-    "VALIDATE_ONLY and DRY_RUN must not mutate Partner Center. Upload, certification submission and publish are separate owner approvals."
-  ]
+    "VALIDATE_ONLY and DRY_RUN must not mutate Partner Center. Upload, certification submission and Publish are separate owner approvals."
+  ],
+  "distribution": {
+    "audience": "PRIVATE_AUDIENCE_TEST",
+    "known_user_group": null,
+    "publishing_hold": "MANUAL",
+    "public_release_approved": false,
+    "tester_account_type": "PERSONAL_MICROSOFT_ACCOUNT",
+    "store_install_required": true
+  }
 }
