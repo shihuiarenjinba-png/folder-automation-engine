@@ -98,6 +98,33 @@ class ConsumerUIHelpersTests(unittest.TestCase):
                 if junction.exists():
                     junction.rmdir()
 
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_parent_picker_rejects_folder_beneath_junction_ancestor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            real_root = base / "real-root"
+            selected = real_root / "selected"
+            selected.mkdir(parents=True)
+            alias = base / "alias"
+            result = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(real_root)],
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                self.skipTest(f"junction creation unavailable: {result.stderr.strip()}")
+            try:
+                app = self._app("")
+                app.root_path = Mock()
+                with patch("folder_desktop_app.filedialog.askdirectory",
+                           return_value=str(alias / "selected")), \
+                     patch("folder_desktop_app.messagebox.showwarning") as warning:
+                    app.choose_folder()
+                app.root_path.set.assert_not_called()
+                warning.assert_called_once()
+            finally:
+                if alias.exists():
+                    alias.rmdir()
+
     def test_field_edit_revokes_old_preview_and_does_not_touch_files(self):
         app = FolderDesktop.__new__(FolderDesktop)
         app.preview_revision = "old-approved"
