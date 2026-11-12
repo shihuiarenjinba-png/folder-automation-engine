@@ -67,6 +67,38 @@ class FolderAutomationSafetyTests(unittest.TestCase):
                     if link.exists():
                         link.rmdir()
 
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_root_with_junction_ancestor_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            real_root = base / "real-root"
+            real_root.mkdir()
+            (real_root / "inbox").mkdir()
+            (real_root / "processed").mkdir()
+            alias = base / "root-alias"
+            result = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(real_root)],
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                self.skipTest(f"junction creation unavailable: {result.stderr.strip()}")
+            try:
+                # The selected root itself is not the junction; one lexical
+                # ancestor is. Resolution must not hide that redirect.
+                nested_root = alias / "nested"
+                nested_root.mkdir()
+                (nested_root / "inbox").mkdir()
+                with self.assertRaisesRegex(ConfigError, "junction"):
+                    Engine({
+                        "root_dir": str(nested_root),
+                        "input_dir": "inbox",
+                        "rules": [{"glob": "*.txt", "action": "copy",
+                                   "destination": "processed"}],
+                    }, dry_run=True)
+            finally:
+                if alias.exists():
+                    alias.rmdir()
+
     def test_collision_remains_unprocessed_and_retries_when_freed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
