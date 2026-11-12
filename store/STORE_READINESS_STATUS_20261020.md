@@ -44,13 +44,16 @@ The repository record is evidence, not authorization. Previous accepted Store ve
 | Windows EXE / unsigned MSIX build | PENDING EXACT-HEAD RERUN | latest HEAD build, GUI smoke, self-test, pack/unpack, inventory and hashes all PASS |
 | Toolchain reproducibility | IMPLEMENTED | pinned build completes with recorded versions |
 | Runtime notices / inventory | IMPLEMENTED, VERIFY ON FINAL ARTIFACT | final package contains notices and inventory matches exact HEAD |
-| Human Windows GUI / filesystem QA | HOLD | approved exact EXE passes JP/EN, Dry Run, synthetic copy/move, watcher, keyboard and DPI checks |
-| Genuine Store screenshots | HOLD | real installed/accepted candidate screenshots captured at current Store-compliant dimensions |
+| Pre-Store CI GUI / filesystem safety | PASS WHEN EXACT HEAD CI PASSES | required for Private audience upload; does not substitute for Store-signed human QA |
+| Store-signed human Windows QA | HOLD | completed after Private audience certification and Store signing; required before Public release |
+| Private-audience listing screenshots | PENDING EXACT-HEAD CAPTURE / OWNER REVIEW | actual app window, JP/EN, 1366×768+; may be used for controlled first submission after visual approval |
+| Public-release screenshots | HOLD | replace/confirm with Store-signed installed candidate before Public release |
 | Final icon visual approval | HOLD | owner accepts generated original icon or supplies an approved replacement |
 | Partner Center identity/version history | HOLD | copied from the live existing product and reconciled with package |
 | Privacy / support / price / markets / age rating | HOLD | owner-approved final commercial values entered into submission bundle |
 | WACK local precheck | OPTIONAL / PENDING | recommended pre-submission check if available; official Store certification remains authoritative |
-| STORE_UPLOAD_READY | HOLD | all mandatory bundle fields pass `qa/validate_store_submission_bundle.py --require-ready` and owner separately approves upload |
+| PRIVATE_AUDIENCE_UPLOAD_READY | HOLD | private-audience bundle passes validator and owner separately approves upload |
+| PUBLIC_STORE_UPLOAD_READY | HOLD | Store-signed install QA + final public assets pass the public-release validator |
 | Certification submission | HOLD | separate explicit owner approval after upload validation |
 | Publication | HOLD | certification success plus separate explicit owner publish approval |
 
