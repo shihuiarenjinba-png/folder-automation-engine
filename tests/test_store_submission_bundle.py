@@ -27,9 +27,14 @@ def ready_bundle():
             "final_logo": "logo.png", "owner_approved": True,
         },
         "proof": {
-            "windows_user_gui_qa_pass": True, "filesystem_safety_qa_pass": True,
-            "symlink_junction_qa_complete": True, "third_party_notices_approved": True,
-            "all_screenshots_genuine": True,
+            "pre_store_ci_gui_pass": True,
+            "private_audience_listing_screenshots_approved": True,
+            "windows_user_gui_qa_pass": False,
+            "store_signed_install_qa_pass": False,
+            "filesystem_safety_qa_pass": True,
+            "symlink_junction_qa_complete": True,
+            "third_party_notices_approved": True,
+            "all_screenshots_genuine": False,
         },
         "permissions": {
             "owner_upload_approval": True, "upload_package": True,
@@ -53,7 +58,7 @@ def ready_bundle():
 class StoreSubmissionBundleTests(unittest.TestCase):
     def test_complete_upload_bundle_is_ready(self):
         state, missing = evaluate(ready_bundle())
-        self.assertEqual(state, "STORE_UPLOAD_READY")
+        self.assertEqual(state, "PRIVATE_AUDIENCE_UPLOAD_READY")
         self.assertEqual(missing, [])
 
     def test_validate_only_draft_is_hold_not_crash(self):
@@ -103,6 +108,43 @@ class StoreSubmissionBundleTests(unittest.TestCase):
         state, missing = evaluate(data)
         self.assertEqual(state, "HOLD")
         self.assertIn("distribution.publishing_hold", missing)
+
+    def test_private_audience_does_not_require_store_signed_install_qa(self):
+        data = ready_bundle()
+        state, missing = evaluate(data)
+        self.assertEqual(state, "PRIVATE_AUDIENCE_UPLOAD_READY")
+        self.assertNotIn("proof.windows_user_gui_qa_pass", missing)
+        self.assertNotIn("proof.store_signed_install_qa_pass", missing)
+
+    def test_public_release_requires_store_signed_install_qa_and_final_screenshots(self):
+        data = ready_bundle()
+        data["distribution"].update({
+            "audience": "PUBLIC_RELEASE",
+            "known_user_group": None,
+            "public_release_approved": True,
+        })
+        data["proof"]["windows_user_gui_qa_pass"] = False
+        data["proof"]["store_signed_install_qa_pass"] = False
+        data["proof"]["all_screenshots_genuine"] = False
+        state, missing = evaluate(data)
+        self.assertEqual(state, "HOLD")
+        self.assertIn("proof.windows_user_gui_qa_pass", missing)
+        self.assertIn("proof.store_signed_install_qa_pass", missing)
+        self.assertIn("proof.all_screenshots_genuine", missing)
+
+    def test_public_release_ready_after_store_signed_qa(self):
+        data = ready_bundle()
+        data["distribution"].update({
+            "audience": "PUBLIC_RELEASE",
+            "known_user_group": None,
+            "public_release_approved": True,
+        })
+        data["proof"]["windows_user_gui_qa_pass"] = True
+        data["proof"]["store_signed_install_qa_pass"] = True
+        data["proof"]["all_screenshots_genuine"] = True
+        state, missing = evaluate(data)
+        self.assertEqual(state, "PUBLIC_STORE_UPLOAD_READY")
+        self.assertEqual(missing, [])
 
     def test_bad_sha_format_is_rejected(self):
         data = ready_bundle()
