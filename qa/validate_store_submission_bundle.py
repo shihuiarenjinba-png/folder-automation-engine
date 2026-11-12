@@ -15,6 +15,8 @@ SHA256_HEX_LEN = 64
 
 
 def _present(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
     return value is not None and value != "" and value != []
 
 
