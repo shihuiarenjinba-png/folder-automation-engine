@@ -56,9 +56,9 @@ jobs:
             Test-Path -LiteralPath (Join-Path $_.FullName 'FolderAutomationEngine\FolderAutomationEngine.exe')
           })
           if ($candidate.Count -ne 1) { throw "Expected exactly one FolderAutomationEngine validation payload" }
-          ./qa/folder-store-listing-capture.ps1 \
-            -ExecutablePath (Join-Path $candidate[0].FullName 'FolderAutomationEngine\FolderAutomationEngine.exe') \
-            -EvidenceDirectory (Join-Path $candidate[0].FullName ("store-listing-candidate-" + $env:GITHUB_RUN_ID)) \
+          ./qa/folder-store-listing-capture.ps1 `
+            -ExecutablePath (Join-Path $candidate[0].FullName 'FolderAutomationEngine\\FolderAutomationEngine.exe') `
+            -EvidenceDirectory (Join-Path $candidate[0].FullName ("store-listing-candidate-" + $env:GITHUB_RUN_ID)) `
             -EphemeralRunner
       - name: Build and verify unsigned Store MSIX draft
         shell: powershell
