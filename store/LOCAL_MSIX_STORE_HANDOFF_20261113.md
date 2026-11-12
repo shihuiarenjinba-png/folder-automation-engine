@@ -67,8 +67,8 @@ Package flighting is for later updates after a base Store package exists. Do not
 
 - `BUILD_READY`: exact-head source/tests/build/MSIX provenance PASS.
 - `LOCAL_STATIC_MSIX_VERIFIED`: exact MSIX and all provenance files independently match; no installation implied.
-- `PRIVATE_AUDIENCE_SUBMISSION_READY`: all Partner Center fields and private-audience group are complete, upload validator passes and owner approves upload/submission phases.
-- `STORE_SIGNED_INSTALL_READY`: private-audience certification succeeds and Microsoft Store offers the signed package to the approved tester.
-- `STORE_UPLOAD_READY`: automation bundle passes the fail-closed validator plus owner upload approval.
+- `PRIVATE_AUDIENCE_UPLOAD_READY`: CI/safety/MSIX evidence, private-audience listing assets, Partner Center metadata and known-user group are complete; the fail-closed validator passes and the owner separately approves upload.
+- `STORE_SIGNED_INSTALL_READY`: private-audience certification succeeds and Microsoft Store offers the Microsoft-signed package to the approved tester.
+- `PUBLIC_STORE_UPLOAD_READY`: after Store-signed install QA, final screenshots and public-release approval are complete; the public-release validator passes.
 - `PUBLIC_RELEASE_GO`: separate final approval after Store-signed install QA and certification evidence.
 
