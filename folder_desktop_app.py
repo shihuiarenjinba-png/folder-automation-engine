@@ -15,7 +15,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from folder_automation import ConfigError, Engine, is_link_like
+from folder_automation import ConfigError, Engine, is_link_like, require_plain_path
 from folder_desktop_flow import build_config, build_multi_config, revision, snapshot_inputs, format_activity
 from ui_preferences import load_preferences, save_preferences
 
@@ -474,7 +474,8 @@ class FolderDesktop:
             if not self.root_path.get().strip():
                 raise ConfigError(self.t("先に親フォルダーを選んでください。",
                                          "Choose a parent folder first."))
-            root = Path(self.root_path.get()).expanduser().resolve(strict=True)
+            root_input = require_plain_path(Path(self.root_path.get()).expanduser(), "root_dir")
+            root = root_input.resolve(strict=True)
             if not root.is_dir():
                 raise ConfigError("Parent folder must be a directory")
         except (OSError, ValueError, ConfigError) as exc:
@@ -503,8 +504,16 @@ class FolderDesktop:
         if self.busy or self.watch_active:
             return
         name = filedialog.askdirectory(parent=self.root)
-        if name:
-            self.root_path.set(name)
+        if not name:
+            return
+        try:
+            candidate = require_plain_path(Path(name).expanduser(), "root_dir")
+            if not candidate.resolve(strict=True).is_dir():
+                raise ConfigError(self.t("通常のフォルダーを選択してください。", "Choose a regular folder."))
+            self.root_path.set(str(candidate))
+        except (OSError, ValueError, ConfigError) as exc:
+            messagebox.showwarning(self.t("選択できません", "Invalid folder"),
+                                   str(exc), parent=self.root)
 
     def append(self, data: str) -> None:
         self.log.configure(state="normal")
