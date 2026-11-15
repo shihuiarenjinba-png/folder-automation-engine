@@ -26,5 +26,12 @@
     "visible_results_required": true,
     "do_not_advertise_unavailable_features": true,
     "store_price_or_market_change_requires_owner_approval": true
+  },
+  "recommended_store_model": {
+    "base_price": "PAID_LOW_COST_ONE_TIME",
+    "exact_price_tier": null,
+    "free_trial_days": 7,
+    "trial_scope": "FULL_CURRENT_VERIFIED_CORE",
+    "rationale": "Free file organizers exist; use a low one-time price plus a full 7-day trial so buyers can verify the simpler guided UI and safety workflow before paying."
   }
 }
