@@ -128,15 +128,15 @@ class FolderDesktop:
         shell = ttk.Frame(self.root)
         shell.pack(fill="both", expand=True)
         self.preview_summary.set(self.t(
-            "① フォルダーと条件を選んで試運転してください。変更はまだ行われません。",
-            "Choose folders and preview first. No files change during preview."))
+            "まず整理する場所と条件を選び、「変更せず確認」を実行してください。",
+            "Choose where to organize files and use Preview without changes first."))
         history = ttk.LabelFrame(shell, text=self.t(
             "③ 対象ファイル・実行結果（常に表示）",
             "3. Files and activity (always visible)"), padding=9)
         history.pack(side="bottom", fill="x", padx=12, pady=(3, 10))
         ttk.Label(history, textvariable=self.preview_summary,
                   font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.watch_indicator.set(self.t("監視停止中", "Watching off"))
+        self.watch_indicator.set(self.t("自動整理 OFF", "Automatic organizing OFF"))
         ttk.Label(history, textvariable=self.watch_indicator).pack(anchor="e")
         ttk.Label(history, textvariable=self.status, wraplength=820).pack(anchor="w")
         logframe = ttk.Frame(history)
@@ -173,15 +173,15 @@ class FolderDesktop:
         ttk.Label(
             frame,
             text=self.t(
-                "① 親フォルダーを選ぶ → 整理元と整理先を選ぶ → ② 試運転 → 結果確認 → 実行",
-                "1. Choose a parent folder and two subfolders → 2. Preview → Review results → Run",
+                "このアプリは、指定したフォルダーのファイルを種類ごとに安全にコピー・移動します。\n① 整理用フォルダーを選ぶ → ② 変更せず確認 → ③ 結果を見て実行",
+                "Safely copy or move files by type.\n1. Choose the folders → 2. Preview without changes → 3. Review and run",
             ),
             wraplength=810, justify="left",
         ).pack(anchor="w", pady=(10, 12))
         editor = ttk.LabelFrame(frame, text=self.t("① 整理する条件", "1. Choose your rule"), padding=12)
         editor.pack(fill="x", pady=(0, 10))
         editor.columnconfigure(1, weight=1)
-        ttk.Label(editor, text=self.t("親フォルダー", "Parent folder")).grid(
+        ttk.Label(editor, text=self.t("整理用フォルダー", "Organizing folder")).grid(
             row=0, column=0, sticky="w", padx=(0, 8), pady=5
         )
         self.root_entry = ttk.Entry(editor, textvariable=self.root_path)
@@ -191,8 +191,8 @@ class FolderDesktop:
         )
         self.choose_btn.grid(row=0, column=2, padx=(8, 0))
         rows = [
-            (1, "整理するフォルダー（親の直下）", "Source subfolder (inside parent)", self.input_folder),
-            (2, "コピー・移動先（親の直下）", "Destination subfolder (inside parent)", self.output_folder),
+            (1, "整理するファイルが入る場所", "Folder with files to organize", self.input_folder),
+            (2, "整理したファイルの行き先", "Where organized files go", self.output_folder),
             (3, "対象ファイル（例 *.pdf）", "Filename pattern (e.g. *.pdf)", self.pattern),
         ]
         self.entries: list[ttk.Entry] = [self.root_entry]
@@ -229,13 +229,13 @@ class FolderDesktop:
             ), wraplength=740,
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
         ttk.Label(editor, text=self.t(
-            "整理元・整理先は親フォルダー直下の既存サブフォルダーから選べます。",
-            "Choose existing source/destination subfolders directly inside the parent."),
+            "上の「整理用フォルダー」の中にある2つのフォルダーを選びます。",
+            "Choose two existing folders inside the organizing folder."),
             foreground="#415168").grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
-        buttons = ttk.LabelFrame(frame, text=self.t("② 試運転 → ③ 実行", "2. Preview → 3. Run"), padding=8)
+        buttons = ttk.LabelFrame(frame, text=self.t("② 変更せず確認 → ③ 実行", "2. Preview without changes → 3. Run"), padding=8)
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
-            buttons, text=self.t("試運転（変更なし）", "Dry Run (no changes)"), command=self.preview
+            buttons, text=self.t("変更せず確認", "Preview without changes"), command=self.preview
         )
         self.preview_btn.pack(side="left", padx=(0, 14), ipady=7, ipadx=8)
         self.run_btn = tk.Button(
@@ -257,9 +257,9 @@ class FolderDesktop:
         )
         self.load_btn.pack(side="left")
         self.advanced_btn = ttk.Button(frame,
-            text=self.t("詳細設定を閉じる ▲" if self.advanced_visible else "詳細設定・自動監視を表示 ▼",
+            text=self.t("詳細設定を閉じる ▲" if self.advanced_visible else "複数ルール・自動整理を表示 ▼",
                         "Hide advanced options ▲" if self.advanced_visible else
-                        "Advanced rules and watching ▼"), command=self.toggle_advanced)
+                        "Multiple rules & automatic organizing ▼"), command=self.toggle_advanced)
         self.advanced_btn.pack(anchor="w", pady=(0, 8))
         self.advanced_panel = ttk.Frame(frame)
         if self.advanced_visible:
@@ -269,26 +269,26 @@ class FolderDesktop:
                         "Add and reorder rules (up to 10)"), command=self.manage_rules)
         self.rules_btn.pack(anchor="w", pady=(0, 8))
         watcher = ttk.LabelFrame(self.advanced_panel, text=self.t(
-            "自動監視（任意）", "Optional watching"), padding=8)
+            "新しいファイルも自動整理（任意）", "Automatically organize new files (optional)"), padding=8)
         watcher.pack(fill="x", pady=(0, 10))
-        ttk.Label(watcher, text=self.t("監視間隔（秒）", "Check every (seconds)")).pack(side="left")
+        ttk.Label(watcher, text=self.t("新しいファイルを確認する間隔（秒）", "Check for new files every (seconds)")).pack(side="left")
         self.watch_interval_entry = ttk.Entry(watcher, textvariable=self.watch_seconds, width=7)
         self.watch_interval_entry.pack(side="left", padx=(6, 10))
-        self.watch_start_btn = ttk.Button(watcher, text=self.t("監視を開始", "Start watching"),
+        self.watch_start_btn = ttk.Button(watcher, text=self.t("自動整理を開始", "Start automatic organizing"),
                                           command=self.start_watch)
         self.watch_start_btn.pack(side="left")
-        self.watch_stop_btn = ttk.Button(watcher, text=self.t("監視を停止", "Stop watching"),
+        self.watch_stop_btn = ttk.Button(watcher, text=self.t("自動整理を停止", "Stop automatic organizing"),
                                          command=self.stop_watch)
         self.watch_stop_btn.pack(side="left", padx=(7, 0))
         ttk.Label(watcher, text=self.t(
-            "開始時にルールを承認します。今後届くファイルにも適用します。PCとアプリの稼働中のみ。",
-            "Approved rule also processes future files. Runs only while app and PC stay on."),
+            "開始すると、新しく入ったファイルにも同じ整理ルールを自動で適用します。PCとアプリの起動中だけ動きます。",
+            "New files are organized with the same rule while the PC and app are running."),
             wraplength=360).pack(side="right", padx=(12, 0))
 
 
         ttk.Label(frame, text=self.t(
-            "安全な使い方：試運転で対象を確認し、承認してからコピー・移動します。自動監視は必要な時だけ開始できます。",
-            "Safe workflow: review files in the preview, then approve copy or move. Start optional watching only when needed.",
+            "安全な使い方：「変更せず確認」で対象を見てからコピー・移動します。新しいファイルの自動整理は必要な時だけ開始してください。",
+            "Safe workflow: preview first, then approve copy or move. Turn on automatic organizing only when you need it.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
 
@@ -463,8 +463,8 @@ class FolderDesktop:
         else:
             self.advanced_panel.pack_forget()
         self.advanced_btn.configure(text=self.t(
-            "詳細設定を閉じる ▲" if self.advanced_visible else "詳細設定・自動監視を表示 ▼",
-            "Hide advanced options ▲" if self.advanced_visible else "Advanced rules and watching ▼"))
+            "詳細設定を閉じる ▲" if self.advanced_visible else "複数ルール・自動整理を表示 ▼",
+            "Hide advanced options ▲" if self.advanced_visible else "Multiple rules & automatic organizing ▼"))
 
     def choose_child_folder(self, target: tk.StringVar) -> None:
         """Only allow selecting a real direct subfolder of the chosen parent."""
@@ -645,7 +645,7 @@ class FolderDesktop:
         self.watch_stop.clear()
         self.watch_active = True
         if getattr(self, "watch_indicator", None) is not None:
-            self.watch_indicator.set(self.t("● 監視中", "● Watching"))
+            self.watch_indicator.set(self.t("● 自動整理 ON", "● Automatic organizing ON"))
         self.set_busy(False)
         self.status.set(self.t("監視を開始中…", "Starting watcher…"))
 
@@ -735,8 +735,8 @@ class FolderDesktop:
                         self.status.set(self.t("監視中（ルールによる処理が完了）",
                                                "Watching (scan completed)"))
                     if getattr(self, "watch_indicator", None) is not None:
-                        self.watch_indicator.set(self.t("● 監視中", "● Watching")
-                            if self.watch_active else self.t("監視停止中", "Watching off"))
+                        self.watch_indicator.set(self.t("● 自動整理 ON", "● Automatic organizing ON")
+                            if self.watch_active else self.t("自動整理 OFF", "Automatic organizing OFF"))
                     self.set_busy(False)
                     continue
                 self.set_busy(False)
