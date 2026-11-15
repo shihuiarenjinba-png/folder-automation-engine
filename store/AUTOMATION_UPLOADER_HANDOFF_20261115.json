@@ -1,16 +1,17 @@
 {
-  "schema_version": "folder-store-automation-handoff/1",
-  "generated_for": "Windows-all-auto -> Windows-Automator",
+  "schema_version": "store-product-handoff/2",
   "product": {
     "id": "folder-engine",
     "type": "app",
     "name": "Folder Automation Engine",
     "edition": "standard",
+    "summary": "Safely copy or move files by type with preview and optional automatic organizing.",
     "submission_kind": "update",
     "submission_route": "msix_pwa_app",
     "repository": "https://github.com/shihuiarenjinba-png/folder-automation-engine",
     "source_ref": "codex/folder-standard-consumer-ui-20261026",
-    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e"
+    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+    "market_preset": ""
   },
   "package": {
     "artifact_run_id": 43697191105,
@@ -22,11 +23,10 @@
     "exe_sha256": "d53161ea1119445afb8070d989d4a72e8019895b8c5e166738a3e38718b54976",
     "package_inventory_count": 999,
     "third_party_notices_verified": true,
-    "unsigned_engineering_candidate": true,
-    "local_materialized_path": null
+    "unsigned_engineering_candidate": true
   },
-  "identity_record": {
-    "store_id_recorded": "9P99MJX1R4V6",
+  "identity": {
+    "store_id": "9P99MJX1R4V6",
     "name": "OkinawaDesktopTools.FolderAutomationEngine",
     "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
     "version": "1.0.0.0",
@@ -35,7 +35,8 @@
     "accepted_version_history_verified": false
   },
   "commercial": {
-    "model": "paid_one_time_low_cost",
+    "model": "paid_one_time",
+    "strategy": "low_cost",
     "currency": "JPY",
     "exact_partner_center_price_value": null,
     "price_confirmed": false,
@@ -46,7 +47,7 @@
     "publishing_hold": "manual_publish"
   },
   "distribution": {
-    "first_stage": "PRIVATE_AUDIENCE_TEST",
+    "audience": "PRIVATE_AUDIENCE_TEST",
     "known_user_group": null,
     "public_release_approved": false
   },
@@ -61,21 +62,14 @@
     "owner_confirmation_complete": false,
     "fields": null
   },
-  "gates": {
-    "build_ready": true,
-    "local_static_msix_verified": true,
-    "windows_checker_ready": false,
-    "partner_center_identity_ready": false,
-    "price_ready": false,
-    "assets_ready": false,
+  "approvals": {
     "owner_approved_for_draft": false,
     "certification_submit_approved": false,
     "publish_approved": false
   },
-  "rules": [
-    "Never infer Store ID, Identity, Publisher, Version, price tier, markets, IARC answers or security answers.",
-    "Materialize the exact MSIX and re-hash before Windows-all-auto preflight.",
-    "Seven-day trial is owner-approved, but exact paid price remains HOLD until selected from the current Partner Center options.",
-    "Draft write, certification submission and Publish are three separate approval gates."
+  "notes": [
+    "Package/source/identity record are immutable technical evidence; live Partner Center values must be re-copied before draft write.",
+    "Seven-day full trial is owner-approved. Exact paid price/tier remains HOLD until selected from current Partner Center options.",
+    "Draft write, certification submission and Publish are separate approval gates."
   ]
 }
