@@ -82,6 +82,18 @@
     "Read-only submission inspection proved EXISTING_PRODUCT_INITIAL_SUBMISSION: Start submission=1, Start update=0, draft packages URL=0, active package=0.",
     "Version 1.0.0.0 has NO_CONFIRMED_CONFLICT; there is no Accepted package history to verify for this first submission.",
     "Owner authorizes creating the initial Partner Center draft via Start submission only. Package upload, pricing write, certification submission and Publish remain separate gates.",
-    "Seven-day full trial is owner-approved. Exact paid JPY price/tier remains HOLD until visible in the created draft."
+    "Seven-day full trial is owner-approved. Exact paid JPY price/tier remains HOLD until visible in the created draft.",
+    "Local final QA is now a package-bound receipt gate in Windows-all-auto; the frozen product MSIX is not rebuilt for this metadata-only change."
+  ],
+  "qa": {
+    "github_exact_head_ci_pass": true,
+    "local_final_pass": false,
+    "store_signed_install_pass": false
+  },
+  "release_holds": [
+    "LOCAL_FINAL_QA_RECEIPT",
+    "INITIAL_DRAFT_AND_LIVE_STORE_FIELDS",
+    "OWNER_ASSET_SECURITY_AUDIENCE_APPROVAL",
+    "STORE_SIGNED_INSTALL_QA_BEFORE_PUBLIC_RELEASE"
   ]
 }
