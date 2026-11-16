@@ -6,7 +6,7 @@
     "name": "Folder Automation Engine",
     "edition": "standard",
     "summary": "Safely copy or move files by type with preview and optional automatic organizing.",
-    "submission_kind": "update",
+    "submission_kind": "new",
     "submission_route": "msix_pwa_app",
     "repository": "https://github.com/shihuiarenjinba-png/folder-automation-engine",
     "source_ref": "codex/folder-standard-consumer-ui-20261026",
@@ -31,10 +31,15 @@
     "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
     "version": "1.0.0.0",
     "architecture": "x64",
-    "live_partner_center_reverified": false,
+    "live_partner_center_reverified": true,
     "accepted_version_history_verified": false,
     "package_family_name": "OkinawaDesktopTools.FolderAutomationEngine_j8yefg9jgfh58",
-    "package_sid": "S-1-15-2-795676864-310991790-2802347502-2718627192-2651328981-310414558-459028798"
+    "package_sid": "S-1-15-2-795676864-310991790-2802347502-2718627192-2651328981-310414558-459028798",
+    "live_reverify_receipt_status": "EXISTING_IDENTITY_EXACT_MATCH",
+    "version_history_state": "NO_ACCEPTED_PACKAGE_OBSERVED",
+    "version_conflict": false,
+    "submission_state": "EXISTING_PRODUCT_INITIAL_SUBMISSION",
+    "submission_state_verified": true
   },
   "commercial": {
     "model": "paid_one_time",
@@ -67,11 +72,16 @@
   "approvals": {
     "owner_approved_for_draft": false,
     "certification_submit_approved": false,
-    "publish_approved": false
+    "publish_approved": false,
+    "initial_submission_start_approved": true,
+    "initial_submission_start_approved_by": "owner-chat-2026-11-16"
   },
   "notes": [
-    "Package/source/identity record are immutable technical evidence; live Partner Center values must be re-copied before draft write.",
-    "Seven-day full trial is owner-approved. Exact paid price/tier remains HOLD until selected from current Partner Center options.",
-    "Draft write, certification submission and Publish are separate approval gates."
+    "Frozen product code/package remains source 51597b...; later branch commits are Store metadata/runbook only.",
+    "Partner Center Identity was reverified by exact-match local receipt.",
+    "Read-only submission inspection proved EXISTING_PRODUCT_INITIAL_SUBMISSION: Start submission=1, Start update=0, draft packages URL=0, active package=0.",
+    "Version 1.0.0.0 has NO_CONFIRMED_CONFLICT; there is no Accepted package history to verify for this first submission.",
+    "Owner authorizes creating the initial Partner Center draft via Start submission only. Package upload, pricing write, certification submission and Publish remain separate gates.",
+    "Seven-day full trial is owner-approved. Exact paid JPY price/tier remains HOLD until visible in the created draft."
   ]
 }
