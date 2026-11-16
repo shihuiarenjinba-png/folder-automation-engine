@@ -35,6 +35,53 @@ This authorization does NOT include package upload, pricing write, certification
 3. `Windows-Automator`
    - branch `codex/msix-commercial-contract-20261115`
 
+## Stage 0 — exact-package local final QA receipt
+
+Before preparing any Automator input, prove that the downloaded frozen package is the
+same package that passed local Windows acceptance.
+
+After syncing `Windows-all-auto` to its current Group B handoff branch, run its
+generic static preflight:
+
+```powershell
+$preflightOut = Join-Path $work 'exact-package-preflight'
+Set-Location $allAuto
+pwsh -File .\scripts\run_local_exact_package_preflight.ps1 `
+  -ProductRepoPath $folderRepo `
+  -PackagePath $msix `
+  -HandoffPath $handoff `
+  -MainExeName 'FolderAutomationEngine.exe' `
+  -OutputDirectory $preflightOut `
+  -RunSelfTest
+```
+
+Then create the bound QA receipt template:
+
+```powershell
+$qaReceipt = Join-Path $work 'local-final-qa-receipt.json'
+python .\scripts\create_local_final_qa_receipt_template.py `
+  --handoff $handoff `
+  --output $qaReceipt
+```
+
+Complete the physical JP/EN, DPI, copy/move, safety, restart/normal-exit acceptance.
+Set `status=PASS` and the required booleans true only after those checks actually
+pass. Keep `package_rebuilt=false` and `security_bypass_used=false`.
+
+Apply the receipt:
+
+```powershell
+$handoffAfterQa = Join-Path $work 'store-handoff-after-local-qa.json'
+python .\scripts\apply_local_final_qa_receipt.py `
+  --handoff $handoff `
+  --receipt $qaReceipt `
+  --output $handoffAfterQa
+$handoff = $handoffAfterQa
+```
+
+A receipt with a different source SHA/MSIX SHA is rejected. Do not rebuild the frozen
+candidate merely to make QA pass.
+
 ## Stage A — prepare the HOLD Automator input
 
 Use the exact local MSIX path already verified against the frozen SHA.
