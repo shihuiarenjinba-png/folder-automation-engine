@@ -1,0 +1,38 @@
+{
+  "schema_version": "existing-store-initial-submission-start/1",
+  "task_id": "folder-engine-initial-submission-start-20261116",
+  "owner_approved": true,
+  "owner_approval_scope": "Start submission only; create the first Partner Center draft for the existing Store product. No package upload, pricing write, certification submission, or publish.",
+  "expected": {
+    "product_name": "Folder Automation Engine",
+    "store_id": "9P99MJX1R4V6",
+    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+    "package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+    "submission_state": "EXISTING_PRODUCT_INITIAL_SUBMISSION",
+    "submission_kind": "new",
+    "identity_name": "OkinawaDesktopTools.FolderAutomationEngine",
+    "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC"
+  },
+  "permissions": {
+    "read_partner_center": true,
+    "create_product": false,
+    "start_submission": true,
+    "upload_package": false,
+    "edit_pricing": false,
+    "submit_certification": false,
+    "publish": false
+  },
+  "after_draft_read_only_collection": {
+    "pricing_and_availability": true,
+    "category": true,
+    "customer_groups": true,
+    "security_submission_options": true,
+    "package_upload": false
+  },
+  "success_contract": {
+    "required_status": "INITIAL_SUBMISSION_DRAFT_CREATED",
+    "require_nonempty_draft_id": true,
+    "require_same_store_id": true,
+    "require_no_other_write": true
+  }
+}
