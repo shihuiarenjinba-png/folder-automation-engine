@@ -63,6 +63,7 @@ pwsh -File .\scripts\run_local_exact_package_preflight.ps1 `
   -HandoffPath $handoff `
   -MainExeName 'FolderAutomationEngine.exe' `
   -OutputDirectory $preflightOut `
+  -SourceCheckoutMode ContainedCommit `
   -RunSelfTest
 ```
 
@@ -338,6 +339,30 @@ Record at minimum:
 
 Only after this signed-build QA is PASS may the product advance to
 `READY_FOR_PUBLIC_RELEASE_APPROVAL`.
+
+## Reusable local pre-upload readiness entrypoint
+
+After the recovered Draft has been bound into the handoff, use Windows-all-auto:
+
+```powershell
+$readinessDir = Join-Path $work 'store-preupload-readiness'
+Set-Location $allAuto
+pwsh -File .\scripts\run_store_preupload_readiness.ps1 `
+  -ProductRepoPath $folderRepo `
+  -PackagePath $msix `
+  -HandoffPath $handoffAfterDraft `
+  -MainExeName 'FolderAutomationEngine.exe' `
+  -OutputDirectory $readinessDir `
+  -SourceCheckoutMode ContainedCommit
+```
+
+This command is deliberately local/read-only with respect to Partner Center. It must
+never upload the package, submit certification, or publish. A successful result is
+only:
+
+`READY_FOR_MSIX_UPLOAD_APPROVAL`
+
+which means the separate Store execution owner may request the package-upload approval.
 
 ## Separate later gates
 
