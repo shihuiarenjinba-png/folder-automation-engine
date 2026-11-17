@@ -150,5 +150,32 @@ class ConsumerUIHelpersTests(unittest.TestCase):
         app.action.set.assert_not_called()
 
 
+    def test_set_busy_uses_only_ttk_button_options(self):
+        app = FolderDesktop.__new__(FolderDesktop)
+        app.busy = False
+        app.watch_active = False
+        app.closing = False
+        app.preview_revision = None
+        app.entries = [Mock()]
+        app.action_combo = Mock()
+        app.choose_btn = Mock()
+        app.preview_btn = Mock()
+        app.save_btn = Mock()
+        app.load_btn = Mock()
+        app.rules_btn = Mock()
+        app.advanced_btn = Mock()
+        app.child_browse_buttons = []
+        app.run_btn = Mock()
+        app.watch_interval_entry = Mock()
+        app.watch_start_btn = Mock()
+        app.watch_stop_btn = Mock()
+
+        app.set_busy(False)
+
+        options = app.run_btn.configure.call_args.kwargs
+        self.assertEqual(options, {"state": "disabled"})
+        self.assertNotIn("bg", options)
+
+
 if __name__ == "__main__":
     unittest.main()
