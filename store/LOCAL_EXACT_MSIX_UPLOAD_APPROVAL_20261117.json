@@ -1,0 +1,65 @@
+{
+  "schema_version": "folder-store-exact-msix-upload-approval/1",
+  "approved_at": "2026-11-17",
+  "approval_scope": "Upload exactly one pre-verified Folder Automation Engine MSIX to the already-recovered Partner Center Draft after the deterministic pre-upload gate reaches READY_FOR_MSIX_UPLOAD_APPROVAL. This approval does not authorize certification, private publication, promo-code generation, or public publication.",
+  "product": {
+    "name": "Folder Automation Engine",
+    "store_id": "9P99MJX1R4V6",
+    "draft_id": "1152921505702423660",
+    "identity_name": "OkinawaDesktopTools.FolderAutomationEngine",
+    "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
+    "version": "1.0.0.0",
+    "architecture": "x64"
+  },
+  "candidate": {
+    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+    "file_name": "FolderAutomationEngine_1.0.0.0_x64_StoreDraft_UNSIGNED.msix",
+    "package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+    "exe_sha256": "d53161ea1119445afb8070d989d4a72e8019895b8c5e166738a3e38718b54976",
+    "workflow_run": 43697191105,
+    "store_artifact_id": 14155171103,
+    "windows_artifact_id": 14155410314
+  },
+  "verified_ci": [
+    {
+      "run_id": 43697191053,
+      "name": "Folder automation safety regression",
+      "conclusion": "success"
+    },
+    {
+      "run_id": 43697191076,
+      "name": "Guided folder GUI and safe copy/move tests",
+      "conclusion": "success"
+    },
+    {
+      "run_id": 43697191105,
+      "name": "Folder desktop and unsigned Store draft",
+      "conclusion": "success"
+    }
+  ],
+  "local_requirements_before_upload": {
+    "exact_local_path_must_exist": true,
+    "exact_local_sha_must_match": true,
+    "preupload_gate_required_status": "READY_FOR_MSIX_UPLOAD_APPROVAL",
+    "store_assets_owner_approved": true,
+    "price_confirmed": true,
+    "private_audience_group_confirmed": true,
+    "security_owner_confirmation_complete": true,
+    "read_only_partner_center_state_reconciled": true
+  },
+  "runtime_qa_policy": {
+    "unsigned_exact_msix_runtime_status": "APPLICATION_CONTROL_BLOCKED",
+    "do_not_weaken_windows_security": true,
+    "upload_purpose": "PRIVATE_STORE_SIGNING_AND_CERTIFICATION_LANE",
+    "public_release_requires_store_signed_physical_qa": true,
+    "acquisition_cost_paid_must_be_false": true
+  },
+  "prohibited": {
+    "start_submission_again": true,
+    "substitute_package": true,
+    "rebuild_to_match_hash": true,
+    "submit_for_certification": true,
+    "publish_private": true,
+    "publish_public": true
+  }
+}
