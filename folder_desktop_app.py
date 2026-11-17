@@ -88,8 +88,9 @@ class FolderDesktop:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Folder Automation Engine")
-        self.root.geometry("940x650")
-        self.root.minsize(720, 570)
+        self.root.geometry("1040x720")
+        self.root.minsize(820, 620)
+        self.root.configure(bg="#f3f6fa")
         self.lang = tk.StringVar(value=load_gui_language())
         self.displayed_language = self.lang.get()
         self.root_path = tk.StringVar()
@@ -121,19 +122,93 @@ class FolderDesktop:
     def t(self, ja: str, en: str) -> str:
         return en if self.lang.get() == "English" else ja
 
+    def _configure_styles(self) -> None:
+        """Apply a restrained Store-ready visual system without changing behavior."""
+        style = ttk.Style(self.root)
+        themes = style.theme_names()
+        if "clam" in themes and style.theme_use() not in {"vista", "xpnative"}:
+            style.theme_use("clam")
+
+        surface = "#ffffff"
+        canvas = "#f3f6fa"
+        text = "#1f2937"
+        muted = "#5f6b7a"
+        accent = "#1769c2"
+
+        style.configure("App.TFrame", background=canvas)
+        style.configure("Hero.TFrame", background=surface)
+        style.configure("Card.TFrame", background=surface)
+        style.configure(
+            "Card.TLabelframe",
+            background=surface,
+            borderwidth=1,
+            relief="solid",
+            padding=12,
+        )
+        style.configure(
+            "Card.TLabelframe.Label",
+            background=surface,
+            foreground=text,
+            font=("Segoe UI", 11, "bold"),
+        )
+        style.configure(
+            "Heading.TLabel",
+            background=surface,
+            foreground=text,
+            font=("Segoe UI", 20, "bold"),
+        )
+        style.configure(
+            "Subheading.TLabel",
+            background=surface,
+            foreground=muted,
+            font=("Segoe UI", 10),
+        )
+        style.configure(
+            "Body.TLabel",
+            background=surface,
+            foreground=text,
+            font=("Segoe UI", 10),
+        )
+        style.configure(
+            "Muted.TLabel",
+            background=surface,
+            foreground=muted,
+            font=("Segoe UI", 9),
+        )
+        style.configure(
+            "Primary.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(14, 8),
+        )
+        style.configure(
+            "Secondary.TButton",
+            font=("Segoe UI", 10),
+            padding=(10, 7),
+        )
+        style.map(
+            "Primary.TButton",
+            foreground=[("disabled", "#8994a3"), ("!disabled", "#ffffff")],
+            background=[("disabled", "#d8dee7"), ("!disabled", accent), ("active", "#125aa8")],
+        )
+        style.configure("TEntry", padding=5)
+        style.configure("TCombobox", padding=4)
+
     def build(self) -> None:
+        self._configure_styles()
         self.displayed_language = self.lang.get()
         for child in self.root.winfo_children():
             child.destroy()
-        shell = ttk.Frame(self.root)
+        shell = ttk.Frame(self.root, style="App.TFrame")
         shell.pack(fill="both", expand=True)
         self.preview_summary.set(self.t(
             "まず整理する場所と条件を選び、「変更せず確認」を実行してください。",
             "Choose where to organize files and use Preview without changes first."))
-        history = ttk.LabelFrame(shell, text=self.t(
-            "③ 対象ファイル・実行結果（常に表示）",
-            "3. Files and activity (always visible)"), padding=9)
-        history.pack(side="bottom", fill="x", padx=12, pady=(3, 10))
+        history = ttk.LabelFrame(
+            shell,
+            text=self.t("③ 対象ファイル・実行結果", "3. Files and activity"),
+            style="Card.TLabelframe",
+        )
+        history.pack(side="bottom", fill="x", padx=18, pady=(8, 16))
         ttk.Label(history, textvariable=self.preview_summary,
                   font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
         self.watch_indicator.set(self.t("自動整理 OFF", "Automatic organizing OFF"))
@@ -141,31 +216,54 @@ class FolderDesktop:
         ttk.Label(history, textvariable=self.status, wraplength=820).pack(anchor="w")
         logframe = ttk.Frame(history)
         logframe.pack(fill="x", pady=(4, 0))
-        self.log = tk.Text(logframe, wrap="word", height=5, state="disabled",
-                           bg="#f7fafd", fg="#21384f", padx=8, pady=6, relief="flat")
+        self.log = tk.Text(
+            logframe,
+            wrap="word",
+            height=5,
+            state="disabled",
+            bg="#f8fafc",
+            fg="#21384f",
+            padx=10,
+            pady=8,
+            relief="solid",
+            bd=1,
+            highlightthickness=0,
+            font=("Segoe UI", 9),
+        )
         logscroll = ttk.Scrollbar(logframe, command=self.log.yview)
         self.log.configure(yscrollcommand=logscroll.set)
         self.log.pack(side="left", fill="both", expand=True)
         logscroll.pack(side="right", fill="y")
-        formhost = ttk.Frame(shell)
-        formhost.pack(fill="both", expand=True, padx=10, pady=(7, 0))
-        canvas = tk.Canvas(formhost, highlightthickness=0)
+        formhost = ttk.Frame(shell, style="App.TFrame")
+        formhost.pack(fill="both", expand=True, padx=18, pady=(16, 0))
+        canvas = tk.Canvas(formhost, highlightthickness=0, bg="#f3f6fa")
         scrollbar = ttk.Scrollbar(formhost, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        frame = ttk.Frame(canvas, padding=18)
+        frame = ttk.Frame(canvas, padding=(0, 0, 0, 10), style="App.TFrame")
         window = canvas.create_window((0, 0), window=frame, anchor="nw")
         frame.bind("<Configure>", lambda _event: canvas.configure(
             scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda event: canvas.itemconfigure(
             window, width=event.width))
-        heading = ttk.Frame(frame)
-        heading.pack(fill="x")
+        heading = ttk.Frame(frame, style="Hero.TFrame", padding=(18, 16))
+        heading.pack(fill="x", pady=(0, 12))
+        title_box = ttk.Frame(heading, style="Hero.TFrame")
+        title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
-            heading, text=self.t("フォルダー自動整理", "Folder Automation Engine"),
-            font=("Segoe UI", 18, "bold"),
-        ).pack(side="left", anchor="w")
+            title_box,
+            text=self.t("フォルダー自動整理", "Folder Automation Engine"),
+            style="Heading.TLabel",
+        ).pack(anchor="w")
+        ttk.Label(
+            title_box,
+            text=self.t(
+                "確認してから実行する、安全なファイル整理ツール",
+                "A safer file organizer that previews changes before running",
+            ),
+            style="Subheading.TLabel",
+        ).pack(anchor="w", pady=(3, 0))
         lang = ttk.Combobox(heading, textvariable=self.lang, state="readonly",
                             values=("日本語", "English"), width=10)
         lang.pack(side="right")
@@ -173,12 +271,18 @@ class FolderDesktop:
         ttk.Label(
             frame,
             text=self.t(
-                "このアプリは、指定したフォルダーのファイルを種類ごとに安全にコピー・移動します。\n① 整理用フォルダーを選ぶ → ② 変更せず確認 → ③ 結果を見て実行",
-                "Safely copy or move files by type.\n1. Choose the folders → 2. Preview without changes → 3. Review and run",
+                "① フォルダーを選ぶ   →   ② 変更せず確認   →   ③ 内容を見て実行",
+                "1. Choose folders   →   2. Preview without changes   →   3. Review and run",
             ),
-            wraplength=810, justify="left",
-        ).pack(anchor="w", pady=(10, 12))
-        editor = ttk.LabelFrame(frame, text=self.t("① 整理する条件", "1. Choose your rule"), padding=12)
+            wraplength=900,
+            justify="left",
+            style="Subheading.TLabel",
+        ).pack(anchor="w", padx=18, pady=(0, 12))
+        editor = ttk.LabelFrame(
+            frame,
+            text=self.t("① 整理する条件", "1. Choose your rule"),
+            style="Card.TLabelframe",
+        )
         editor.pack(fill="x", pady=(0, 10))
         editor.columnconfigure(1, weight=1)
         ttk.Label(editor, text=self.t("整理用フォルダー", "Organizing folder")).grid(
@@ -232,28 +336,40 @@ class FolderDesktop:
             "上の「整理用フォルダー」の中にある2つのフォルダーを選びます。",
             "Choose two existing folders inside the organizing folder."),
             foreground="#415168").grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
-        buttons = ttk.LabelFrame(frame, text=self.t("② 変更せず確認 → ③ 実行", "2. Preview without changes → 3. Run"), padding=8)
+        buttons = ttk.LabelFrame(
+            frame,
+            text=self.t("② 変更せず確認 → ③ 実行", "2. Preview without changes → 3. Run"),
+            style="Card.TLabelframe",
+        )
         buttons.pack(fill="x", pady=(0, 10))
         self.preview_btn = ttk.Button(
-            buttons, text=self.t("変更せず確認", "Preview without changes"), command=self.preview
+            buttons,
+            text=self.t("変更せず確認", "Preview without changes"),
+            command=self.preview,
+            style="Secondary.TButton",
         )
         self.preview_btn.pack(side="left", padx=(0, 14), ipady=7, ipadx=8)
-        self.run_btn = tk.Button(
-            buttons, text=self.t("確認して実行", "Confirm and run"),
-            command=self.run_live, bg="#1966ba", fg="white", activebackground="#14518f",
-            activeforeground="white", disabledforeground="#425066",
-            relief="flat", bd=0, padx=18, pady=8,
-            font=("Segoe UI", 10, "bold"), cursor="hand2"
+        self.run_btn = ttk.Button(
+            buttons,
+            text=self.t("確認して実行", "Confirm and run"),
+            command=self.run_live,
+            style="Primary.TButton",
         )
         self.run_btn.pack(side="left", padx=(0, 10))
         configs = ttk.Frame(buttons)
         configs.pack(side="left", padx=(22, 0))
         self.save_btn = ttk.Button(
-            configs, text=self.t("設定を保存", "Save rules"), command=self.save_config
+            configs,
+            text=self.t("設定を保存", "Save rules"),
+            command=self.save_config,
+            style="Secondary.TButton",
         )
         self.save_btn.pack(side="left", padx=(0, 10))
         self.load_btn = ttk.Button(
-            configs, text=self.t("保存済み設定を開く", "Open saved rules"), command=self.load_config
+            configs,
+            text=self.t("保存済み設定を開く", "Open saved rules"),
+            command=self.load_config,
+            style="Secondary.TButton",
         )
         self.load_btn.pack(side="left")
         self.advanced_btn = ttk.Button(frame,
