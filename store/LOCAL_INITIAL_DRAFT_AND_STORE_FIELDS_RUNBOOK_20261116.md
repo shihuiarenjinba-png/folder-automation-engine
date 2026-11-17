@@ -83,6 +83,8 @@ the exact unsigned executable has already been observed as blocked by Windows
 Application Control. Re-launching it is not required to prove the static package
 binding and must not become a loop.
 
+Recorded unsigned execution status: `APPLICATION_CONTROL_BLOCKED`.
+
 If Windows Application Control blocks the exact executable, record the block and stop.
 Do **not** change policy, add a temporary certificate, or use a bypass. In that case,
 keep `local-final-qa-receipt/1` as HOLD and use the Windows-all-auto
