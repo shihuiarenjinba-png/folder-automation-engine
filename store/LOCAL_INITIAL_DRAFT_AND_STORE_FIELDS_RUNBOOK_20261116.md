@@ -63,8 +63,7 @@ pwsh -File .\scripts\run_local_exact_package_preflight.ps1 `
   -HandoffPath $handoff `
   -MainExeName 'FolderAutomationEngine.exe' `
   -OutputDirectory $preflightOut `
-  -SourceCheckoutMode ContainedCommit `
-  -RunSelfTest
+  -SourceCheckoutMode ContainedCommit
 ```
 
 Then create the bound QA receipt template:
@@ -78,6 +77,11 @@ python .\scripts\create_local_final_qa_receipt_template.py `
 
 Attempt physical JP/EN, DPI, copy/move, safety, restart/normal-exit acceptance only
 if the exact unsigned executable can run without weakening Windows security.
+
+For this frozen Folder candidate, do not pass `-RunSelfTest` to the generic preflight:
+the exact unsigned executable has already been observed as blocked by Windows
+Application Control. Re-launching it is not required to prove the static package
+binding and must not become a loop.
 
 If Windows Application Control blocks the exact executable, record the block and stop.
 Do **not** change policy, add a temporary certificate, or use a bypass. In that case,
