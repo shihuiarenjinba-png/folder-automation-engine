@@ -1,7 +1,7 @@
 {
   "schema_version": "folder-store-exact-msix-upload-approval/1",
   "approved_at": "2026-11-17",
-  "approval_scope": "Upload exactly one pre-verified Folder Automation Engine MSIX to the already-recovered Partner Center Draft after the deterministic pre-upload gate reaches READY_FOR_MSIX_UPLOAD_APPROVAL. This approval does not authorize certification, private publication, promo-code generation, or public publication.",
+  "approval_scope": "REVOKED. Do not upload the previously frozen MSIX. Rebuild and re-freeze a new candidate from the approved polished UI source, rerun required QA, then obtain a new exact-package upload approval.",
   "product": {
     "name": "Folder Automation Engine",
     "store_id": "9P99MJX1R4V6",
@@ -60,6 +60,20 @@
     "rebuild_to_match_hash": true,
     "submit_for_certification": true,
     "publish_private": true,
-    "publish_public": true
+    "publish_public": true,
+    "upload_previously_frozen_package": true
+  },
+  "status": "REVOKED_UI_QUALITY",
+  "revoked_at": "2026-11-18",
+  "revocation_reason": "Owner rejected the current Store screenshot/UI quality before package upload. A UI-only polish commit changes product source bytes, so the previously frozen MSIX SHA must not be uploaded as the final sales candidate.",
+  "replacement_requirements": {
+    "polished_source_commit": "bb0b1a161308170781088dd899ab0d4b2ddb3e42",
+    "rebuild_required": true,
+    "new_msix_sha_required": true,
+    "new_exe_sha_required": true,
+    "rerun_safety_gui_store_build_ci": true,
+    "store_screenshots_must_be_recaptured_from_new_candidate": true,
+    "new_preupload_gate_receipt_required": true,
+    "new_upload_approval_required": true
   }
 }
