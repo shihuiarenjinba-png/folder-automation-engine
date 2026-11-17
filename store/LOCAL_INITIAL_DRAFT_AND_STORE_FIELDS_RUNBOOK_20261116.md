@@ -165,6 +165,32 @@ The receipt must contain a numeric `draft_id` and prove:
 
 Any ambiguous result is HOLD. Do not retry Start submission blindly.
 
+### Ambiguous Start submission recovery
+
+If the UI driver/Computer Use layer reports an unknown result, do **not** switch to a
+screen-coordinate click and do not immediately repeat the action.
+
+Use the Windows-Automator read-only reconciliation path:
+
+```powershell
+$reconcileReceipt = Join-Path $work 'initial-submission-reconcile-receipt.json'
+Set-Location $automator
+pwsh -File .\scripts\reconcile_initial_submission_attempt.ps1 `
+  -Input $automatorInput `
+  -Output $reconcileReceipt `
+  -CdpUrl $cdp
+```
+
+Interpret exactly:
+
+- `INITIAL_SUBMISSION_DRAFT_PRESENT_RECOVERED`: a Draft exists; bind that Draft and never click Start submission again.
+- `INITIAL_SUBMISSION_NOT_OBSERVED_RETRY_REQUIRES_NEW_APPROVAL`: live state is still initial; stop and request a **new** execution-time owner approval before retrying.
+- `HOLD_AMBIGUOUS_WRITE`: stop. No retry.
+
+This reconciliation is read-only and never grants retry authorization by itself.
+Partner Center writes must stay on the selector/state-based Windows-Automator path;
+coordinate clicking is not part of the approved Store automation route.
+
 ## Stage C — bind the Draft receipt to the Store handoff
 
 ```powershell
