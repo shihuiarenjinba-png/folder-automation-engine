@@ -650,10 +650,9 @@ class FolderDesktop:
                        self.rules_btn, self.advanced_btn, *self.child_browse_buttons):
             button.configure(state=state)
         can_run = state == "normal" and self.preview_revision is not None
-        self.run_btn.configure(
-            state="normal" if can_run else "disabled",
-            bg="#1966ba" if can_run else "#d6e0ed"
-        )
+        # Primary.TButton's style map owns enabled/disabled colors. ttk.Button
+        # rejects the legacy tk.Button bg option at runtime.
+        self.run_btn.configure(state="normal" if can_run else "disabled")
         self.watch_interval_entry.configure(state=state)
         self.watch_start_btn.configure(state=state)
         self.watch_stop_btn.configure(
