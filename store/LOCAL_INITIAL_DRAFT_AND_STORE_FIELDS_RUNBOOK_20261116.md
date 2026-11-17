@@ -15,13 +15,24 @@ Updated: 2026-11-16 JST
 
 Do not rebuild the product merely because Store metadata commits are newer.
 
-## Owner authorization in this runbook
+## Owner authorization model
 
-The owner authorizes exactly one Partner Center write at the first stage:
+This runbook is evidence and procedure only. It is **not** standing authorization for
+any Partner Center write.
 
-`Start submission` -> create the first draft for the existing Store product.
+Immediately before each external write, require direct execution-time owner approval.
+The following are separate gates and approval for one must never be reused for another:
 
-This authorization does NOT include package upload, pricing write, certification submission, or Publish.
+- `Start submission`
+- customer-group creation
+- pricing save/change
+- MSIX upload
+- certification submission
+- Private-audience publication
+- promotional-code generation
+- later Public-audience publication
+
+Repository values such as `owner_approved=true` are evidence only.
 
 ## Repositories
 
@@ -64,11 +75,19 @@ python .\scripts\create_local_final_qa_receipt_template.py `
   --output $qaReceipt
 ```
 
-Complete the physical JP/EN, DPI, copy/move, safety, restart/normal-exit acceptance.
-Set `status=PASS` and the required booleans true only after those checks actually
-pass. Keep `package_rebuilt=false` and `security_bypass_used=false`.
+Attempt physical JP/EN, DPI, copy/move, safety, restart/normal-exit acceptance only
+if the exact unsigned executable can run without weakening Windows security.
 
-Apply the receipt:
+If Windows Application Control blocks the exact executable, record the block and stop.
+Do **not** change policy, add a temporary certificate, or use a bypass. In that case,
+keep `local-final-qa-receipt/1` as HOLD and use the Windows-all-auto
+`pre-store-static-qa-receipt/1` path to enter the limited Private Store signing lane.
+
+If the unsigned executable naturally runs, set `status=PASS` and the required
+booleans true only after the physical checks actually pass. Keep
+`package_rebuilt=false` and `security_bypass_used=false`.
+
+Apply the receipt only for a real physical PASS:
 
 ```powershell
 $handoffAfterQa = Join-Path $work 'store-handoff-after-local-qa.json'
@@ -242,6 +261,57 @@ Then run:
 2. Windows-Automator `night-run --execution-mode dry_run`;
 3. confirm no Partner Center mutation;
 4. require `READY_FOR_AUTOMATOR_DRAFT` before any package upload.
+
+
+## Stage G — Microsoft Store signing without buying the paid app
+
+The production signing strategy is Microsoft Store signing. Do not buy a separate CA
+code-signing certificate solely for this Store release.
+
+For this paid Folder product, a Private audience tester would normally be charged the
+configured price. Therefore the owner must **not** be required to purchase their own
+app merely to perform the final signed-build QA.
+
+Preferred no-purchase test route after the Private-audience submission has completed
+certification and the product has reached the Store publishing phase:
+
+1. keep the app restricted to the selected Private audience;
+2. verify that the owner's **personal Microsoft account** is a member of the selected
+   known-user group;
+3. once Partner Center makes promotional codes available for the published product,
+   generate a promo code only under separate execution-time owner approval;
+4. redeem that code with the same personal Microsoft account;
+5. acquire/install the Microsoft Store-delivered signed package for free;
+6. perform final JP/EN, DPI, copy/move, safety, restart and normal-exit QA;
+7. bind the result with Windows-all-auto `store-signed-install-qa-receipt/1`.
+
+A promotional code is not expected to work before the product completes the publishing
+phase. Do not temporarily change the paid product to Free just to avoid a test purchase
+unless the owner explicitly chooses that commercial change.
+
+For ordinary Windows MSIX apps, there is no Xbox/GDK-style development sandbox to use
+as a drop-in replacement for this Store test lane. GDK/Xbox development sandboxes are
+game-specific. Package flights become useful after the base app has already been
+published; they are not the first-release substitute for this Private-audience pilot.
+
+## Stage H — signed Store build acceptance
+
+After the promo-code acquisition succeeds, test the Store-installed build itself.
+Record at minimum:
+
+- Microsoft Store delivery verified;
+- trusted Microsoft Store signature verified;
+- Store ID / Identity / Version still match;
+- JP and EN GUI;
+- DPI 100 / 125 / 150%;
+- Preview / Dry Run;
+- approved copy and move;
+- no-overwrite behavior;
+- symlink/junction safety;
+- restart and normal exit.
+
+Only after this signed-build QA is PASS may the product advance to
+`READY_FOR_PUBLIC_RELEASE_APPROVAL`.
 
 ## Separate later gates
 
