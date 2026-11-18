@@ -30,8 +30,50 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class FolderStoreCapture {
+    public const int ENUM_CURRENT_SETTINGS = -1;
+    public const int CDS_TEST = 0x00000002;
+    public const int DISP_CHANGE_SUCCESSFUL = 0;
+
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+    public struct DEVMODE {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmDeviceName;
+        public short dmSpecVersion;
+        public short dmDriverVersion;
+        public short dmSize;
+        public short dmDriverExtra;
+        public int dmFields;
+        public int dmPositionX;
+        public int dmPositionY;
+        public int dmDisplayOrientation;
+        public int dmDisplayFixedOutput;
+        public short dmColor;
+        public short dmDuplex;
+        public short dmYResolution;
+        public short dmTTOption;
+        public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst=32)] public string dmFormName;
+        public short dmLogPixels;
+        public int dmBitsPerPel;
+        public int dmPelsWidth;
+        public int dmPelsHeight;
+        public int dmDisplayFlags;
+        public int dmDisplayFrequency;
+        public int dmICMMethod;
+        public int dmICMIntent;
+        public int dmMediaType;
+        public int dmDitherType;
+        public int dmReserved1;
+        public int dmReserved2;
+        public int dmPanningWidth;
+        public int dmPanningHeight;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+    public static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+    public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll", SetLastError=true)]
@@ -40,6 +82,47 @@ public static class FolderStoreCapture {
     public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
 }
 '@
+
+function New-DisplayMode {
+    $mode=New-Object FolderStoreCapture+DEVMODE
+    $mode.dmSize=[Runtime.InteropServices.Marshal]::SizeOf([FolderStoreCapture+DEVMODE])
+    return $mode
+}
+
+function Get-CurrentDisplayMode {
+    $mode=New-DisplayMode
+    if (-not [FolderStoreCapture]::EnumDisplaySettings($null,[FolderStoreCapture]::ENUM_CURRENT_SETTINGS,[ref]$mode)) {
+        throw "Unable to read current Windows display mode"
+    }
+    return $mode
+}
+
+function Enable-NativeStoreDisplayMode {
+    $modes=@()
+    for ($index=0; ; $index++) {
+        $mode=New-DisplayMode
+        if (-not [FolderStoreCapture]::EnumDisplaySettings($null,$index,[ref]$mode)) { break }
+        if ($mode.dmPelsWidth -ge 1366 -and $mode.dmPelsHeight -ge 768 -and $mode.dmBitsPerPel -ge 24) {
+            $modes += $mode
+        }
+    }
+    if ($modes.Count -eq 0) { throw "No native Windows display mode can show a 1366x768 app window" }
+    $target=$modes | Sort-Object @{Expression={ [long]$_.dmPelsWidth * [long]$_.dmPelsHeight }},dmPelsWidth,dmPelsHeight | Select-Object -First 1
+    $test=[FolderStoreCapture]::ChangeDisplaySettings([ref]$target,[FolderStoreCapture]::CDS_TEST)
+    if ($test -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
+        throw "Windows rejected the native Store display mode during validation: $test"
+    }
+    $apply=[FolderStoreCapture]::ChangeDisplaySettings([ref]$target,0)
+    if ($apply -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
+        throw "Windows rejected the native Store display mode: $apply"
+    }
+    Start-Sleep -Milliseconds 800
+    $active=Get-CurrentDisplayMode
+    if ($active.dmPelsWidth -lt 1366 -or $active.dmPelsHeight -lt 768) {
+        throw "Native Store display mode did not remain active: $($active.dmPelsWidth)x$($active.dmPelsHeight)"
+    }
+    return $active
+}
 
 $fixtureRoot=Join-Path ([IO.Path]::GetPathRoot($exe)) "TeamArchive"
 $fixtureRoot=[IO.Path]::GetFullPath($fixtureRoot)
@@ -123,14 +206,17 @@ function Save-AppWindow([IntPtr]$Handle, [string]$File) {
 
 $oldLocal=$env:LOCALAPPDATA
 $oldCapture=$env:FOLDER_STORE_CAPTURE
+$originalDisplayMode=Get-CurrentDisplayMode
+$captureDisplayMode=$null
 $tempLocal=Join-Path $env:RUNNER_TEMP ("FolderStoreCapture-"+[guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Path (Join-Path $tempLocal "FolderAutomationEngine") -Force | Out-Null
-$env:LOCALAPPDATA=$tempLocal
-$env:FOLDER_STORE_CAPTURE="EXACT_PACKAGED_UI_V1"
 $results=@()
 $states=@("setup", "multi-rule", "preview", "result", "automatic-ready")
 $japaneseLocale=(-join @([char]0x65E5,[char]0x672C,[char]0x8A9E))
 try {
+    $captureDisplayMode=Enable-NativeStoreDisplayMode
+    New-Item -ItemType Directory -Path (Join-Path $tempLocal "FolderAutomationEngine") -Force | Out-Null
+    $env:LOCALAPPDATA=$tempLocal
+    $env:FOLDER_STORE_CAPTURE="EXACT_PACKAGED_UI_V1"
     foreach ($case in @(
         [ordered]@{ code="ja"; locale=$japaneseLocale },
         [ordered]@{ code="en"; locale="English" }
@@ -160,7 +246,7 @@ try {
                 }
                 if (-not (Test-Path -LiteralPath $ready)) { throw "UI state did not become ready for $($case.code)/$state" }
                 if (-not $process.Responding) { throw "GUI not responding for $($case.code)/$state" }
-                if (-not [FolderStoreCapture]::SetWindowPos($process.MainWindowHandle,[IntPtr]::Zero,20,20,1366,768,0x0040)) {
+                if (-not [FolderStoreCapture]::SetWindowPos($process.MainWindowHandle,[IntPtr]::Zero,0,0,1366,768,0x0040)) {
                     throw "SetWindowPos failed for $($case.code)/$state"
                 }
                 Start-Sleep -Milliseconds 700
@@ -212,6 +298,12 @@ try {
 } finally {
     $env:LOCALAPPDATA=$oldLocal
     $env:FOLDER_STORE_CAPTURE=$oldCapture
+    if ($null -ne $originalDisplayMode) {
+        $restore=[FolderStoreCapture]::ChangeDisplaySettings([ref]$originalDisplayMode,0)
+        if ($restore -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
+            Write-Warning "Unable to restore original disposable-runner display mode: $restore"
+        }
+    }
     if (Test-Path -LiteralPath $fixtureRoot) {
         $resolved=(Resolve-Path -LiteralPath $fixtureRoot).Path
         if ($resolved -ceq $fixtureRoot) { Remove-Item -LiteralPath $resolved -Recurse -Force }
@@ -228,6 +320,8 @@ try {
     required_states=$states
     capture_count=$results.Count
     captures_per_language=5
+    capture_display_width=$captureDisplayMode.dmPelsWidth
+    capture_display_height=$captureDisplayMode.dmPelsHeight
     private_audience_use_requires_owner_visual_approval=$true
     public_release_requires_store_signed_install_capture=$true
     captures=$results
