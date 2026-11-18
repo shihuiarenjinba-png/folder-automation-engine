@@ -1042,7 +1042,10 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
     """Prepare truthful Store views from real operations in a disposable fixture."""
     app.store_capture_state = state
     app.store_capture_ready_file = ready
-    app.root_path.set(str(fixture))
+    # The external capturer starts the process at the drive root, so this
+    # relative value resolves to the exact fixed fixture without exposing a
+    # machine-specific absolute path in Store images.
+    app.root_path.set(fixture.name)
     app.input_folder.set("Incoming")
     app.output_folder.set("Documents")
     app.pattern.set("*.pdf")
@@ -1053,6 +1056,9 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
     ]
     app.advanced_visible = state in {"multi-rule", "automatic-ready"}
     app.build()
+    # 1362x729 client area produces a 1366x768 outer window on the hosted
+    # Windows runner. Store captures must use native pixels, never upscaling.
+    app.root.geometry("1362x729")
 
     def show_advanced() -> None:
         app.root.update_idletasks()
