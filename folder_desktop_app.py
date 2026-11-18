@@ -1044,6 +1044,8 @@ def _format_store_capture_activity(raw: str, *, japanese: bool) -> str:
         if isinstance(event, dict) and "destination" in event:
             destination = PureWindowsPath(str(event["destination"]))
             event = dict(event)
+            if "file" in event:
+                event["file"] = PureWindowsPath(str(event["file"])).name
             event["destination"] = f"{destination.parent.name}/{destination.name}"
             safe_lines.append(json.dumps(event, ensure_ascii=False))
         else:
