@@ -255,6 +255,7 @@ class FolderDesktop:
             child.destroy()
         shell = ttk.Frame(self.root, style="App.TFrame")
         shell.pack(fill="both", expand=True)
+        self.shell = shell
         self.preview_summary.set(self.t(
             "まず整理する場所と条件を選び、「変更せず確認」を実行してください。",
             "Choose where to organize files and use Preview without changes first."))
@@ -291,6 +292,7 @@ class FolderDesktop:
         logscroll.pack(side="right", fill="y")
         formhost = ttk.Frame(shell, style="App.TFrame")
         formhost.pack(fill="both", expand=True, padx=18, pady=(16, 0))
+        self.formhost = formhost
         canvas = tk.Canvas(formhost, highlightthickness=0, bg="#f3f6fa")
         self.form_canvas = canvas
         scrollbar = ttk.Scrollbar(formhost, orient="vertical", command=canvas.yview)
@@ -299,6 +301,7 @@ class FolderDesktop:
         canvas.pack(side="left", fill="both", expand=True)
         frame = ttk.Frame(canvas, padding=(0, 0, 0, 10), style="App.TFrame")
         window = canvas.create_window((0, 0), window=frame, anchor="nw")
+        self.form_canvas_window = window
         frame.bind("<Configure>", lambda _event: canvas.configure(
             scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda event: canvas.itemconfigure(
@@ -1087,6 +1090,15 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
     # Windows runner. Store captures must use native pixels, never upscaling.
     app.root.maxsize(2000, 1600)
     app.root.geometry("1362x729+0+0")
+    # GitHub's hosted desktop may report a narrower virtual work area even
+    # though PrintWindow supports the requested off-screen size. Fix the root
+    # container as well as the window so controls cannot remain at 1040px and
+    # leave a misleading blank strip in a nominally 1366px capture.
+    app.shell.configure(width=1362, height=729)
+    app.shell.pack_propagate(False)
+    app.formhost.configure(width=1326)
+    app.form_canvas.configure(width=1304)
+    app.form_canvas.itemconfigure(app.form_canvas_window, width=1304)
     app.root.update_idletasks()
 
     def show_advanced(position: float = 1.0) -> None:
