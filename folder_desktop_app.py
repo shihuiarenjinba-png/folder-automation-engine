@@ -139,6 +139,9 @@ class FolderDesktop:
         style.configure("Hero.TFrame", background=surface)
         style.configure("Card.TFrame", background=surface)
         style.configure(
+            "TLabel", background=surface, foreground=text, font=("Segoe UI", 10)
+        )
+        style.configure(
             "Card.TLabelframe",
             background=surface,
             borderwidth=1,
@@ -208,18 +211,18 @@ class FolderDesktop:
             text=self.t("③ 対象ファイル・実行結果", "3. Files and activity"),
             style="Card.TLabelframe",
         )
-        history.pack(side="bottom", fill="x", padx=18, pady=(8, 16))
+        history.pack(side="bottom", fill="x", padx=18, pady=(6, 10))
         ttk.Label(history, textvariable=self.preview_summary,
                   font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
         self.watch_indicator.set(self.t("自動整理 OFF", "Automatic organizing OFF"))
         ttk.Label(history, textvariable=self.watch_indicator).pack(anchor="e")
         ttk.Label(history, textvariable=self.status, wraplength=820).pack(anchor="w")
-        logframe = ttk.Frame(history)
+        logframe = ttk.Frame(history, style="Card.TFrame")
         logframe.pack(fill="x", pady=(4, 0))
         self.log = tk.Text(
             logframe,
             wrap="word",
-            height=5,
+            height=2,
             state="disabled",
             bg="#f8fafc",
             fg="#21384f",
@@ -356,7 +359,7 @@ class FolderDesktop:
             style="Primary.TButton",
         )
         self.run_btn.pack(side="left", padx=(0, 10))
-        configs = ttk.Frame(buttons)
+        configs = ttk.Frame(buttons, style="Card.TFrame")
         configs.pack(side="left", padx=(22, 0))
         self.save_btn = ttk.Button(
             configs,
