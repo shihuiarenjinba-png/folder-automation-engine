@@ -1,0 +1,39 @@
+{
+  "schema_version": "existing-store-identity-reverify/1",
+  "task_id": "folder-engine-existing-identity-reverify-20261116",
+  "product_id": "folder-engine",
+  "source_repository": "https://github.com/shihuiarenjinba-png/folder-automation-engine",
+  "source_ref": "codex/folder-standard-consumer-ui-20261026",
+  "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+  "package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+  "expected": {
+    "product_name": "Folder Automation Engine",
+    "store_id": "9P99MJX1R4V6",
+    "identity_name": "OkinawaDesktopTools.FolderAutomationEngine",
+    "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
+    "publisher_display_name": "Okinawa Desktop Tools",
+    "package_family_name": "OkinawaDesktopTools.FolderAutomationEngine_j8yefg9jgfh58",
+    "package_sid": "S-1-15-2-795676864-310991790-2802347502-2718627192-2651328981-310414558-459028798"
+  },
+  "permissions": {
+    "read_partner_center": true,
+    "create_product": false,
+    "start_submission": false,
+    "upload_package": false,
+    "edit_pricing": false,
+    "submit_certification": false,
+    "publish": false
+  },
+  "local_output": {
+    "recommended_directory": "C:\\qa\\folder-engine\\identity-reverify",
+    "receipt_name": "existing-identity-reverify-receipt.json",
+    "raw_browser_evidence_must_remain_local": true
+  },
+  "success_contract": {
+    "required_status": "EXISTING_IDENTITY_EXACT_MATCH",
+    "require_all_exact_fields": true,
+    "on_any_mismatch": "HOLD_IDENTITY_CONFLICT",
+    "may_update_store_handoff_after_success": true,
+    "accepted_version_history_still_separate_check": true
+  }
+}

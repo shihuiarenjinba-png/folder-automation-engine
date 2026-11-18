@@ -16,8 +16,8 @@ Folder Automation Engineは、選択したフォルダー内のファイルを�
 
 既存の保存先ファイルは上書きしません。任意の監視機能は、承認済みの規則と安定した入力だけを処理し、停止操作またはアプリ終了で停止します。アプリは外部サービスへデータを送信せず、広告・分析・アカウントログインも使用しません。
 
-**注意事項:**
-処理前に必ず試運転結果と保存先を確認してください。クラウド同期フォルダー、ネットワークドライブ、特殊なアクセス権、シンボリックリンク／ジャンクション、非常に長いパスは、利用環境ごとの確認が必要です。バックアップ復元検証は別製品・別画面であり、この製品の機能ではありません。
+**安全な使い方:**
+処理前に試運転結果と保存先を確認してください。アプリは通常のローカルフォルダーを対象とし、リンク経由のフォルダーや既存ファイルへの意図しない上書きを避ける安全確認を行います。
 
 **機能候補（各200文字以内）:**
 
@@ -42,8 +42,8 @@ Choose a root folder, input and destination folders, and rules. Review a no-writ
 
 Existing destination files are never overwritten. Optional watching uses the approved rules and processes stable input only; it stops when requested or when the app closes. The app has no external data transmission, ads, analytics or account sign-in.
 
-**Important:**
-Always review the Dry Run and destination before processing. Cloud-synchronized folders, network drives, unusual permissions, symbolic links/junctions and very long paths require environment-specific validation. Backup restore verification is a separate product and is not included in this app.
+**Safe workflow:**
+Review the Dry Run and destination before processing. The app is designed for regular local folders and validates paths to avoid redirected folders and unintended overwrites of existing files.
 
 **Feature candidates (200 characters maximum each):**
 

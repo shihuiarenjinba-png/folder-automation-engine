@@ -1,0 +1,80 @@
+{
+  "schema_version": "store-initial-draft-observation/1",
+  "binding": {
+    "product_name": "Folder Automation Engine",
+    "store_id": "9P99MJX1R4V6",
+    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+    "package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+    "draft_id": null
+  },
+  "pricing": {
+    "visible_after_draft": false,
+    "available_options": [],
+    "recommended_strategy": "low_cost",
+    "selected_partner_center_value": null,
+    "selected_display_price_jpy": null,
+    "owner_confirmed": false,
+    "approved_by": null,
+    "free_trial": "7_days",
+    "free_trial_owner_confirmed": true,
+    "pricing_write_performed": false
+  },
+  "properties": {
+    "available_categories": [],
+    "preferred_category_if_available": "Utilities + tools",
+    "selected_category": null,
+    "owner_confirmed": false,
+    "properties_write_performed": false
+  },
+  "distribution": {
+    "audience": "PRIVATE_AUDIENCE_TEST",
+    "existing_customer_groups": [],
+    "selected_known_user_group": null,
+    "group_creation_required": null,
+    "owner_confirmed": false,
+    "customer_group_write_performed": false
+  },
+  "listing": {
+    "source_copy": "store/STORE_LISTING_DRAFT_JA_EN.md",
+    "japanese_copy_reviewed": false,
+    "english_copy_reviewed": false,
+    "owner_copy_approved": false,
+    "privacy_policy_source": "store/PRIVACY_POLICY.md",
+    "privacy_policy_url": null,
+    "privacy_policy_owner_decision": false,
+    "support_url": null,
+    "support_owner_decision": false
+  },
+  "assets": {
+    "japanese_screenshot_technical_pass": true,
+    "english_screenshot_technical_pass": true,
+    "owner_visual_approval": false,
+    "final_icon_approved": false
+  },
+  "security": {
+    "bound_package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+    "runfulltrust_justification_source": "store/RUNFULLTRUST_JUSTIFICATION.md",
+    "runfulltrust_owner_confirmed": false,
+    "personal_data_answer_owner_confirmed": false,
+    "owner_confirmation_complete": false,
+    "observed_fields": {
+      "security_local_file_access": "yes",
+      "security_external_services": "no",
+      "uses_external_accounts": "no",
+      "security_camera": "no",
+      "security_microphone": "no",
+      "security_location": "no",
+      "security_restricted_capabilities": "yes",
+      "security_non_microsoft_driver_service": "no"
+    },
+    "security_write_performed": false
+  },
+  "writes": {
+    "start_submission_only_authorized": true,
+    "initial_draft_created": false,
+    "package_uploaded": false,
+    "pricing_changed": false,
+    "certification_submitted": false,
+    "published": false
+  }
+}

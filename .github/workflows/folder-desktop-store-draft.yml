@@ -19,7 +19,7 @@ jobs:
       - name: Validate PowerShell build script syntax
         shell: powershell
         run: |
-          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1", "qa/folder-desktop-gui-smoke.ps1")) {
+          foreach ($scriptPath in @("build-folder-desktop-validation.ps1", "store/build_msix_draft.ps1", "qa/folder-desktop-gui-smoke.ps1", "qa/folder-store-listing-capture.ps1", "qa/run-wack-preflight.ps1")) {
             $tokens = $null
             $parseErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -32,7 +32,7 @@ jobs:
           }
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.10'
       - name: Build Folder desktop validation payload
         shell: powershell
         run: |
@@ -48,6 +48,17 @@ jobs:
           ./qa/folder-desktop-gui-smoke.ps1 `
             -ExecutablePath (Join-Path $candidate[0].FullName 'FolderAutomationEngine\FolderAutomationEngine.exe') `
             -EvidenceDirectory (Join-Path $candidate[0].FullName ("ci-gui-smoke-" + $env:GITHUB_RUN_ID)) `
+            -EphemeralRunner
+      - name: Capture real JP/EN Private-audience Store listing candidates
+        shell: powershell
+        run: |
+          $candidate = @(Get-ChildItem -Path dist-folder-validation -Directory | Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.FullName 'FolderAutomationEngine\FolderAutomationEngine.exe')
+          })
+          if ($candidate.Count -ne 1) { throw "Expected exactly one FolderAutomationEngine validation payload" }
+          ./qa/folder-store-listing-capture.ps1 `
+            -ExecutablePath (Join-Path $candidate[0].FullName 'FolderAutomationEngine\\FolderAutomationEngine.exe') `
+            -EvidenceDirectory (Join-Path $candidate[0].FullName ("store-listing-candidate-" + $env:GITHUB_RUN_ID)) `
             -EphemeralRunner
       - name: Build and verify unsigned Store MSIX draft
         shell: powershell
@@ -75,6 +86,13 @@ jobs:
           $actualHash = (Get-FileHash -LiteralPath $msixFile -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($report.msix_sha256 -cne $actualHash) { throw "MSIX SHA-256 mismatch" }
           if ($report.source_exe_sha256 -cne $report.unpacked_exe_sha256) { throw "EXE roundtrip SHA-256 mismatch" }
+          if (-not $report.third_party_notices_verified -or [int]$report.package_inventory_count -lt 1) { throw "Store package notice/inventory evidence missing" }
+          $inventoryFile = Join-Path $outputDir ([string]$report.package_inventory_file)
+          if (-not (Test-Path -LiteralPath $inventoryFile -PathType Leaf)) { throw "Package file inventory missing" }
+          $inventory = Get-Content -LiteralPath $inventoryFile -Raw | ConvertFrom-Json
+          if ($inventory.source_commit -cne $actualCommit -or [int]$inventory.file_count -ne [int]$report.package_inventory_count) { throw "Package inventory provenance mismatch" }
+          python qa/verify_msix_inventory.py $msixFile $inventoryFile
+          if ($LASTEXITCODE -ne 0) { throw "MSIX file inventory verification failed" }
           $shaFile = Join-Path $outputDir "msix.sha256.txt"
           if (-not (Test-Path -LiteralPath $shaFile -PathType Leaf)) { throw "MSIX checksum file missing" }
           $recordedHashLine = (Get-Content -LiteralPath $shaFile -Raw).Trim()
@@ -93,5 +111,6 @@ jobs:
             store-out-*/*.msix
             store-out-*/msix_validation.json
             store-out-*/msix.sha256.txt
+            store-out-*/package_file_inventory.json
           if-no-files-found: error
 

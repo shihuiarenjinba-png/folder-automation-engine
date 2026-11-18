@@ -37,15 +37,33 @@ try {
         & py -3 -m venv $venv
     }
     Assert-Code
-    Invoke-VenvPython @("-m", "pip", "install", "--upgrade", "pip")
-    Invoke-VenvPython @("-m", "pip", "install", "pyinstaller>=6.10,<7")
+    Invoke-VenvPython @("-m", "pip", "install", "--upgrade", "pip==26.3")
+    $buildRequirements = Join-Path $repo "store\build-requirements-win.txt"
+    if (-not (Test-Path -LiteralPath $buildRequirements -PathType Leaf)) {
+        throw "Pinned build requirements missing: $buildRequirements"
+    }
+    Invoke-VenvPython @("-m", "pip", "install", "-r", $buildRequirements)
+    $pythonVersion = (& $python -c "import platform; print(platform.python_version())").Trim()
+    Assert-Code
+    $pyInstallerVersion = (& $python -c "import PyInstaller; print(PyInstaller.__version__)").Trim()
+    Assert-Code
+    if ($pythonVersion -cne "3.12.10" -or $pyInstallerVersion -cne "6.22.3") {
+        throw "Unexpected packaging toolchain: Python=$pythonVersion PyInstaller=$pyInstallerVersion"
+    }
     Invoke-VenvPython @("-m", "compileall", "-q", "folder_automation.py", "folder_desktop_app.py",
           "folder_desktop_flow.py", "tests")
     Invoke-VenvPython @("-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v")
     Invoke-VenvPython @("-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
           "--name", "FolderAutomationEngine", "--distpath", $OutputBase,
           "--workpath", $work, "--specpath", $spec, "folder_desktop_app.py")
-    $exe = Join-Path $OutputBase "FolderAutomationEngine\FolderAutomationEngine.exe"
+    $payloadDirectory = Join-Path $OutputBase "FolderAutomationEngine"
+    $noticeDirectory = Join-Path $payloadDirectory "THIRD_PARTY_NOTICES"
+    Invoke-VenvPython @(
+        (Join-Path $repo "store\collect_runtime_notices.py"),
+        $noticeDirectory,
+        (Join-Path $repo "store\THIRD_PARTY_NOTICES.md")
+    )
+    $exe = Join-Path $payloadDirectory "FolderAutomationEngine.exe"
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
         throw "Wrong packaging entrypoint or EXE missing: $exe"
     }
@@ -59,6 +77,10 @@ try {
         exe_name = "FolderAutomationEngine.exe"
         exe_sha256 = $hash
         packaged_engine_selftest = "PASS"
+        python_version = $pythonVersion
+        pyinstaller_version = $pyInstallerVersion
+        build_requirements_sha256 = (Get-FileHash -LiteralPath $buildRequirements -Algorithm SHA256).Hash.ToLowerInvariant()
+        third_party_notices_present = (Test-Path -LiteralPath $noticeDirectory -PathType Container)
         interactive_gui_acceptance = $false
         third_party_rights_approved = $false
         microsoft_store_submission = $false

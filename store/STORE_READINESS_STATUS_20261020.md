@@ -1,56 +1,120 @@
-# Store readiness status — updated 2026-10-25 JST
+# Folder Automation Engine — Store readiness status
 
-**HOLD / NOT READY FOR STORE UPLOAD, CERTIFICATION OR SALE**
+Updated: 2026-11-16 JST
 
-Branch: `codex/folder-standard-store-qa-20261024`
+**Current decision: PRODUCT / MSIX ENGINEERING PASS / LOCAL STORE EXECUTION HOLD / CERTIFICATION HOLD / PUBLICATION HOLD**
 
-Verified parent HEAD before this QA update: `1203d6ac8ef1c56f6f11e6a510ec30dd737a0400`
+Repository: `shihuiarenjinba-png/folder-automation-engine`  
+Branch: `codex/folder-standard-consumer-ui-20261026`  
+Draft PR: #10 (must remain unmerged until owner approval)
 
-Draft PR: #9 (must remain unmerged until owner approval)
+## Frozen upload candidate
 
-## Verified evidence
-
-- Existing Windows artifact ID: `12552836022`; recorded EXE SHA256: `1D29688199BA0FE6BD0EAC16351F2244B8AB02D865305F7F23805219613098F0`.
-- Existing unsigned MSIX artifact ID: `12552746305`; recorded MSIX SHA256: `782CC7FD6307A2F4BA877D512F240D62A2D9173D2C66AC2162B8419F273AC14C`.
-- The above EXE was hash-checked and launched under the separate, limited owner authorization. Windows Code Integrity blocked process creation; no GUI process ran and no test data changed.
-- Saved blocker: Code Integrity events 3077/3033, Policy ID `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`. No Windows security setting, policy, registry key or certificate store was changed.
-- Source tests on 2026-10-25: 60 run, 57 PASS, 3 SKIP. The three SKIPs are the explicitly retained symbolic-link tests because the current standard-user token cannot create symbolic links.
-- PowerShell parsing, Python compilation and repository diff checks: PASS.
-- Safe-close repair added after the parent HEAD: when a copy/move worker or watcher is active, window close now signals the watcher and waits for the current operation to reach its safe boundary before destroying the GUI. Three no-window regression tests pass.
-- A disposable GitHub-hosted Windows-only GUI-window screenshot smoke is staged. Its JSON explicitly records `human_interactive_qa=false`, `store_listing_eligible=false` and `release_approved=false`.
-
-## Identity and package state
-
-Repository candidate values remain:
+The Store upload candidate is intentionally frozen to product source
+`51597b389384be6cf2b3d85c09ee66099b80807e`.
 
 - Store ID: `9P99MJX1R4V6`
 - Identity Name: `OkinawaDesktopTools.FolderAutomationEngine`
 - Publisher: `CN=46263F21-A700-41DB-8C9B-114C22FB82FC`
-- Candidate PFN: `OkinawaDesktopTools.FolderAutomationEngine_j8yefg9jgfh58`
-- Technical draft version: `1.0.0.0`
+- PFN: `OkinawaDesktopTools.FolderAutomationEngine_j8yefg9jgfh58`
+- Technical package version: `1.0.0.0`
+- Frozen MSIX SHA256: `911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450`
+- Frozen EXE SHA256: `d53161ea1119445afb8070d989d4a72e8019895b8c5e166738a3e38718b54976`
 
-These values must be copied again from the live Partner Center product before any upload. The current package builder produces an **unsigned technical draft** and uses unapproved placeholder artwork.
+PR #10 HEAD `4be9bad467478f66a8a51f18d4a5245e90d69929` is 10 commits ahead of the
+frozen product source, and the GitHub compare contains only Store metadata/runbook
+files. No application source or packaging implementation changed in that range.
+Therefore later metadata-only commits do not invalidate the frozen product package.
+Any future application, packaging, runtime-notice, manifest, identity, or packaged
+asset change MUST invalidate this exception and require a new frozen package/hash.
+
+## Exact-head CI evidence
+
+At PR #10 HEAD `4be9bad467478f66a8a51f18d4a5245e90d69929`:
+
+- Guided folder GUI and safe copy/move tests — run `43788248647`: SUCCESS
+  - Ubuntu: 58 tests, 4 skipped + 4 preference tests, PASS
+  - Windows: same workflow matrix, PASS
+- Folder automation safety regression — run `43788248665`: SUCCESS
+  - 14 tests, 2 skipped, PASS
+- Folder desktop and unsigned Store draft — run `43788248654`: SUCCESS
+  - 87 tests, PASS
+  - frozen EXE self-test: PASS
+  - packaged GUI startup evidence: PASS
+  - real JP/EN Store listing capture: PASS, minimum 1366×768
+  - unsigned MSIX build + MakeAppx pack/unpack: PASS
+  - manifest identity/source/hash/EXE roundtrip guards: PASS
+
+This CI evidence is engineering evidence only. It does not authorize Partner Center
+writes, certification, or publication.
+
+## Engineering state
+
+Completed or implemented:
+
+- consumer-first JP/EN GUI with guided folder selection, Dry Run, approval-gated copy/move, visible result history, settings reload, advanced rules and optional watcher;
+- fail-closed no-overwrite, stale-preview invalidation, staged copy/move safety and safe application close;
+- symbolic-link and Windows junction rejection for root/input/output/state paths and GUI folder selection;
+- additional rejection of a link/junction hidden in any lexical ancestor of the selected root path;
+- pinned Windows packaging toolchain: Python 3.12.10 / PyInstaller 6.22.3 and exact packaging dependencies;
+- exact third-party runtime license evidence copied into the packaged payload;
+- complete staged package file/SHA256 inventory generated for each MSIX build;
+- deterministic repository-generated folder/arrow icon candidate with no external artwork dependency;
+- fail-closed Store submission bundle validator;
+- initial-submission handoff/runbook for an existing Store product with no accepted package history.
+
+## Live Partner Center state already observed
+
+Repository evidence records:
+
+- existing product identity exact-match reverified;
+- submission state: `EXISTING_PRODUCT_INITIAL_SUBMISSION`;
+- submission kind: `new`;
+- version state: `NO_ACCEPTED_PACKAGE_OBSERVED`;
+- no confirmed version conflict for `1.0.0.0`;
+- initial Draft receipt does not yet exist.
+
+These observations are evidence, not continuing authorization. Live Partner Center
+state must be rechecked immediately before any write.
 
 ## Readiness gates
 
-| Stage | State | Reason |
+| Gate | State | Close condition |
 |---|---|---|
-| Source / static QA | PASS WITH 3 SKIPS | 57/60 pass; symbolic-link cases remain untested on this token |
-| Fresh Windows CI artifact | PENDING | Must run from the new exact commit and publish new hashes |
-| Automated CI GUI smoke | PENDING | Runner result and screenshot have not yet been produced |
-| Human Windows GUI QA | BLOCKED | Owner PC launch blocked by Code Integrity; no bypass is permitted |
-| Genuine Store screenshots | NOT TESTED | Must come from an accepted installed candidate, not CI evidence |
-| MSIX install / Start launch | NOT TESTED | Existing draft is unsigned; no install approval is implied |
-| WACK | NOT TESTED | No report exists for the current candidate |
-| Partner Center package upload | HOLD | Fresh identity, final icon, human QA, WACK and owner upload approval are missing |
-| Certification submission / publication | HOLD | Separate explicit owner approval required |
+| Source / automated safety | PASS | rerun if product/application/package code changes |
+| Windows EXE / unsigned MSIX engineering | PASS | frozen package remains bound to source/SHA above |
+| Toolchain reproducibility | PASS | pinned build and recorded versions verified |
+| Runtime notices / inventory | PASS FOR FROZEN CANDIDATE | reverify if packaged contents change |
+| Pre-Store CI GUI / filesystem safety | PASS | does not substitute for Store-signed human QA |
+| Private-audience listing screenshots | CAPTURE PASS / OWNER REVIEW HOLD | owner accepts JP/EN 1366×768+ candidates |
+| Partner Center identity / initial-submission state | READ-ONLY REVERIFY PASS | recheck immediately before Draft write |
+| Local execution environment | HOLD | sync Folder + Windows-all-auto + Windows-Automator to required heads and run local tests |
+| Initial Partner Center Draft | NOT EXECUTED | direct execution-time approval + exact state recheck + one Start submission |
+| Price / category / customer group / security fields | HOLD | read from the created Draft; do not infer |
+| PRIVATE_AUDIENCE_UPLOAD_READY | HOLD | complete Store fields, VALIDATE_ONLY, DRY_RUN, then separate upload approval |
+| Store-signed human Windows QA | HOLD | complete after Private audience certification and Store signing |
+| Public-release screenshots | HOLD | confirm/replace from Store-signed installed candidate |
+| Final icon visual approval | HOLD | owner accepts generated icon or approved replacement |
+| WACK local precheck | OPTIONAL / PENDING | official Store certification remains authoritative |
+| Certification submission | HOLD | separate explicit owner approval after upload validation |
+| Publication | HOLD | certification success plus separate explicit owner publish approval |
 
-## Submission safeguards
+## Next execution order
 
-- Do not disable or weaken Smart App Control, WDAC, Code Integrity, Defender or SmartScreen.
-- Do not install certificates or packages on the owner PC under this document.
-- Microsoft Standard Application License Terms remain the proposed default; legal/owner review is still required.
-- Privacy text may be entered directly when Partner Center offers that option, but current Store policy may require a public URL when personal information is accessed. Confirm the live form before submission.
-- Japan and United States and all price figures remain unapproved proposals. Avoid automatic market expansion.
-- Select the Partner Center publishing hold so certification does not cause unintended automatic publication.
-- Final icon/logo rights, production package artwork, support contact and privacy-policy destination remain unresolved.
+1. Sync the three local worktrees to the required GitHub heads without merging main/release.
+2. Re-run local tests and verify the frozen MSIX SHA256 exactly.
+3. Re-read Partner Center and require exactly `EXISTING_PRODUCT_INITIAL_SUBMISSION`.
+4. With direct execution-time approval, create exactly one initial Draft using `Start submission`.
+5. Bind the Draft receipt to Store ID/source/package SHA.
+6. Read price tier, category, customer groups and security/submission options without saving them.
+7. Incorporate owner-confirmed values and run `VALIDATE_ONLY`.
+8. Run `DRY_RUN` with no Partner Center mutation.
+9. Require a separate owner approval before MSIX upload.
+10. Keep certification submission and Publish as separate later gates.
+
+## Signing path
+
+The Store route remains MSIX. For Microsoft Store distribution, a CA-trusted signing
+certificate is not required before submission; Microsoft signs/re-signs the MSIX
+during Store publishing after certification. Do not weaken Windows security controls
+or install ad-hoc trust certificates merely to force local execution.

@@ -1,0 +1,39 @@
+{
+  "schema_version": "existing-store-post-manual-start-reconcile/1",
+  "task_id": "folder-engine-post-manual-start-reconcile-20261117",
+  "manual_start_submission_already_performed": true,
+  "purpose": "Read-only reconciliation after the product owner manually clicked Start submission. Never click Start submission again.",
+  "expected": {
+    "product_name": "Folder Automation Engine",
+    "store_id": "9P99MJX1R4V6",
+    "source_sha": "51597b389384be6cf2b3d85c09ee66099b80807e",
+    "package_sha256": "911f8eb13abfdbb51bea8f279006d138d6be9cba4a25413416c1d70458676450",
+    "identity_name": "OkinawaDesktopTools.FolderAutomationEngine",
+    "publisher": "CN=46263F21-A700-41DB-8C9B-114C22FB82FC",
+    "version": "1.0.0.0",
+    "architecture": "x64",
+    "required_state": "EXISTING_PRODUCT_DRAFT_PRESENT"
+  },
+  "permissions": {
+    "read_partner_center": true,
+    "create_product": false,
+    "start_submission": false,
+    "start_update": false,
+    "upload_package": false,
+    "edit_pricing": false,
+    "edit_properties": false,
+    "edit_store_listing": false,
+    "edit_submission_options": false,
+    "submit_certification": false,
+    "publish": false
+  },
+  "success_contract": {
+    "required_status": "INITIAL_SUBMISSION_DRAFT_PRESENT_RECOVERED",
+    "require_nonempty_numeric_draft_id": true,
+    "require_nonempty_draft_url": true,
+    "require_same_store_id": true,
+    "require_write_performed_false": true,
+    "on_missing_draft": "HOLD_SUBMISSION_RECONCILE_REQUIRED",
+    "never_retry_start_submission": true
+  }
+}
