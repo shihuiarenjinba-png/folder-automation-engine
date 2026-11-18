@@ -14,7 +14,7 @@ import re
 import sys
 import threading
 import tkinter as tk
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from tkinter import filedialog, messagebox, ttk
 
 from folder_automation import ConfigError, Engine, is_link_like, require_plain_path
@@ -164,6 +164,12 @@ class FolderDesktop:
         ready = getattr(self, "store_capture_ready_file", None)
         if getattr(self, "store_capture_state", None) == state and ready is not None:
             ready.write_text("ready\n", encoding="utf-8")
+
+    def _format_activity_for_display(self, raw: str) -> str:
+        japanese = self.lang.get() == "日本語"
+        if getattr(self, "store_capture_state", None) is not None:
+            return _format_store_capture_activity(raw, japanese=japanese)
+        return format_activity(raw, japanese=japanese)
 
     def _configure_styles(self) -> None:
         """Apply a restrained Store-ready visual system without changing behavior."""
@@ -900,7 +906,7 @@ class FolderDesktop:
                 mode, ok, text, rev, sampled = self.messages.get_nowait()
                 if mode in {"watch", "watch_done"}:
                     if text:
-                        self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
+                        self.append(self._format_activity_for_display(text))
                     if not ok:
                         self.watch_stop.set()
                         self.watch_active = False
@@ -919,7 +925,7 @@ class FolderDesktop:
                     self.set_busy(False)
                     continue
                 self.set_busy(False)
-                self.append(format_activity(text, japanese=self.lang.get() == "日本語"))
+                self.append(self._format_activity_for_display(text))
                 if ok and mode == "preview":
                     try:
                         config = self.get_config()
@@ -1026,6 +1032,25 @@ class FolderDesktop:
             messagebox.showerror(self.t("保存エラー", "Save failed"), str(exc), parent=self.root)
 
 
+def _format_store_capture_activity(raw: str, *, japanese: bool) -> str:
+    """Keep real engine decisions while removing machine-local absolute paths."""
+    safe_lines: list[str] = []
+    for line in raw.splitlines():
+        try:
+            event = json.loads(line)
+        except (ValueError, TypeError):
+            safe_lines.append(line)
+            continue
+        if isinstance(event, dict) and "destination" in event:
+            destination = PureWindowsPath(str(event["destination"]))
+            event = dict(event)
+            event["destination"] = f"{destination.parent.name}/{destination.name}"
+            safe_lines.append(json.dumps(event, ensure_ascii=False))
+        else:
+            safe_lines.append(line)
+    return format_activity("\n".join(safe_lines), japanese=japanese)
+
+
 def _capture_preview_sync(app: FolderDesktop) -> tuple[dict, tuple, int, str]:
     """Run the real engine Dry Run against only the fixed Store fixture."""
     config = app.get_config()
@@ -1062,9 +1087,9 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
     app.root.geometry("1362x729+0+0")
     app.root.update_idletasks()
 
-    def show_advanced() -> None:
+    def show_advanced(position: float = 1.0) -> None:
         app.root.update_idletasks()
-        app.form_canvas.yview_moveto(1.0)
+        app.form_canvas.yview_moveto(position)
 
     if state == "setup":
         app.status.set(app.t(
@@ -1082,8 +1107,8 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
             "複数ルールは上から順に評価し、最初に一致した1件だけを適用します。",
             "Rules are evaluated in order and only the first match is applied.",
         ))
-        app.root.after(50, show_advanced)
-        app.root.after(250, lambda: app._mark_store_capture_ready(state))
+        app.root.after(250, lambda: show_advanced(0.72))
+        app.root.after(500, lambda: app._mark_store_capture_ready(state))
         return
     if state == "preview":
         app.root.after(200, app.preview)
@@ -1096,8 +1121,8 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             count = Engine(config, dry_run=False).scan_once()
-        app.append(format_activity(f"{count} file(s)\n{buffer.getvalue()}",
-                                   japanese=app.lang.get() == "日本語"))
+        app.append(_format_store_capture_activity(
+            f"{count} file(s)\n{buffer.getvalue()}", japanese=app.lang.get() == "日本語"))
         app.preview_revision = None
         app.preview_input_snapshot = None
         app.preview_summary.set(app.t(
@@ -1115,8 +1140,8 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
         config, sampled, count, preview_log = _capture_preview_sync(app)
         app.preview_revision = revision(config)
         app.preview_input_snapshot = sampled
-        app.append(format_activity(f"{count} file(s)\n{preview_log}",
-                                   japanese=app.lang.get() == "日本語"))
+        app.append(_format_store_capture_activity(
+            f"{count} file(s)\n{preview_log}", japanese=app.lang.get() == "日本語"))
         app.preview_summary.set(app.t(
             f"試運転完了：対象 {count} 件。自動整理を開始できる状態です。",
             f"Preview complete: {count} file(s). Automatic organizing is ready to start.",
