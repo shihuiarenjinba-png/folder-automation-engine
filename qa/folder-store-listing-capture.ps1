@@ -68,10 +68,45 @@ public static class FolderStoreCapture {
         public int dmPanningHeight;
     }
 
-    public static DEVMODE CreateDevMode() {
+    private static DEVMODE CreateDevMode() {
         DEVMODE mode = new DEVMODE();
         mode.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
         return mode;
+    }
+
+    public static DEVMODE GetCurrentDisplayMode() {
+        DEVMODE mode = CreateDevMode();
+        if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref mode)) {
+            throw new InvalidOperationException("EnumDisplaySettings(current) failed: " + Marshal.GetLastWin32Error());
+        }
+        return mode;
+    }
+
+    public static DEVMODE FindSmallestDisplayMode(int minimumWidth, int minimumHeight) {
+        bool found = false;
+        long bestArea = long.MaxValue;
+        DEVMODE best = CreateDevMode();
+        for (int index = 0; ; index++) {
+            DEVMODE mode = CreateDevMode();
+            if (!EnumDisplaySettings(null, index, ref mode)) break;
+            if (mode.dmPelsWidth < minimumWidth || mode.dmPelsHeight < minimumHeight || mode.dmBitsPerPel < 24) continue;
+            long area = (long)mode.dmPelsWidth * mode.dmPelsHeight;
+            if (!found || area < bestArea || (area == bestArea && mode.dmPelsWidth < best.dmPelsWidth)) {
+                found = true;
+                bestArea = area;
+                best = mode;
+            }
+        }
+        if (!found) throw new InvalidOperationException("No native Windows display mode satisfies the Store minimum");
+        return best;
+    }
+
+    public static int TestDisplayMode(DEVMODE mode) {
+        return ChangeDisplaySettings(ref mode, CDS_TEST);
+    }
+
+    public static int ApplyDisplayMode(DEVMODE mode) {
+        return ChangeDisplaySettings(ref mode, 0);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -89,34 +124,17 @@ public static class FolderStoreCapture {
 }
 '@
 
-function New-DisplayMode {
-    return [FolderStoreCapture]::CreateDevMode()
-}
-
 function Get-CurrentDisplayMode {
-    $mode=New-DisplayMode
-    if (-not [FolderStoreCapture]::EnumDisplaySettings($null,[FolderStoreCapture]::ENUM_CURRENT_SETTINGS,[ref]$mode)) {
-        throw "Unable to read current Windows display mode"
-    }
-    return $mode
+    return [FolderStoreCapture]::GetCurrentDisplayMode()
 }
 
 function Enable-NativeStoreDisplayMode {
-    $modes=@()
-    for ($index=0; ; $index++) {
-        $mode=New-DisplayMode
-        if (-not [FolderStoreCapture]::EnumDisplaySettings($null,$index,[ref]$mode)) { break }
-        if ($mode.dmPelsWidth -ge 1366 -and $mode.dmPelsHeight -ge 768 -and $mode.dmBitsPerPel -ge 24) {
-            $modes += $mode
-        }
-    }
-    if ($modes.Count -eq 0) { throw "No native Windows display mode can show a 1366x768 app window" }
-    $target=$modes | Sort-Object @{Expression={ [long]$_.dmPelsWidth * [long]$_.dmPelsHeight }},dmPelsWidth,dmPelsHeight | Select-Object -First 1
-    $test=[FolderStoreCapture]::ChangeDisplaySettings([ref]$target,[FolderStoreCapture]::CDS_TEST)
+    $target=[FolderStoreCapture]::FindSmallestDisplayMode(1366,768)
+    $test=[FolderStoreCapture]::TestDisplayMode($target)
     if ($test -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
         throw "Windows rejected the native Store display mode during validation: $test"
     }
-    $apply=[FolderStoreCapture]::ChangeDisplaySettings([ref]$target,0)
+    $apply=[FolderStoreCapture]::ApplyDisplayMode($target)
     if ($apply -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
         throw "Windows rejected the native Store display mode: $apply"
     }
@@ -303,7 +321,7 @@ try {
     $env:LOCALAPPDATA=$oldLocal
     $env:FOLDER_STORE_CAPTURE=$oldCapture
     if ($null -ne $originalDisplayMode) {
-        $restore=[FolderStoreCapture]::ChangeDisplaySettings([ref]$originalDisplayMode,0)
+        $restore=[FolderStoreCapture]::ApplyDisplayMode($originalDisplayMode)
         if ($restore -ne [FolderStoreCapture]::DISP_CHANGE_SUCCESSFUL) {
             Write-Warning "Unable to restore original disposable-runner display mode: $restore"
         }
