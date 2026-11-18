@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from folder_desktop_app import (
     FolderDesktop,
+    _format_store_capture_activity,
     action_label,
     parse_store_capture_request,
     preview_count,
@@ -15,6 +16,18 @@ from folder_desktop_app import (
 
 
 class ConsumerUIHelpersTests(unittest.TestCase):
+    def test_store_capture_activity_removes_absolute_local_paths(self):
+        raw = (
+            '1 file(s)\n'
+            '{"file":"D:\\\\TeamArchive\\\\Incoming\\\\Report.pdf",'
+            '"action":"copy","destination":"D:\\\\TeamArchive\\\\Documents\\\\Report.pdf",'
+            '"dry_run":true}\n'
+        )
+        displayed = _format_store_capture_activity(raw, japanese=False)
+        self.assertIn("Documents/Report.pdf", displayed)
+        self.assertNotIn("D:\\", displayed)
+        self.assertNotIn("TeamArchive", displayed)
+
     def test_store_capture_hook_is_fail_closed_outside_disposable_ci(self):
         args = [
             "--store-capture-state", "setup", "--store-capture-root", "TeamArchive",
