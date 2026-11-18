@@ -68,6 +68,12 @@ public static class FolderStoreCapture {
         public int dmPanningHeight;
     }
 
+    public static DEVMODE CreateDevMode() {
+        DEVMODE mode = new DEVMODE();
+        mode.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+        return mode;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
     [DllImport("user32.dll", CharSet=CharSet.Unicode)]
@@ -84,9 +90,7 @@ public static class FolderStoreCapture {
 '@
 
 function New-DisplayMode {
-    $mode=New-Object FolderStoreCapture+DEVMODE
-    $mode.dmSize=[Runtime.InteropServices.Marshal]::SizeOf([FolderStoreCapture+DEVMODE])
-    return $mode
+    return [FolderStoreCapture]::CreateDevMode()
 }
 
 function Get-CurrentDisplayMode {
