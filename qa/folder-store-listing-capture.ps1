@@ -127,9 +127,10 @@ $env:LOCALAPPDATA=$tempLocal
 $env:FOLDER_STORE_CAPTURE="EXACT_PACKAGED_UI_V1"
 $results=@()
 $states=@("setup", "multi-rule", "preview", "result", "automatic-ready")
+$japaneseLocale=(-join @([char]0x65E5,[char]0x672C,[char]0x8A9E))
 try {
     foreach ($case in @(
-        [ordered]@{ code="ja"; locale="日本語" },
+        [ordered]@{ code="ja"; locale=$japaneseLocale },
         [ordered]@{ code="en"; locale="English" }
     )) {
         $pref=Join-Path $tempLocal "FolderAutomationEngine\preferences.json"
@@ -200,7 +201,7 @@ try {
         }
     }
     if ($results.Count -ne 10) { throw "Expected exactly ten Store captures" }
-    foreach ($locale in @("日本語", "English")) {
+    foreach ($locale in @($japaneseLocale, "English")) {
         if (@($results | Where-Object { $_.language -ceq $locale }).Count -ne 5) {
             throw "Expected five captures for $locale"
         }
