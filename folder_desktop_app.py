@@ -177,6 +177,7 @@ class FolderDesktop:
         text = "#1f2937"
         muted = "#5f6b7a"
         accent = "#1769c2"
+        native_primary_foreground = accent if style.theme_use() in {"vista", "xpnative"} else "#ffffff"
 
         style.configure("App.TFrame", background=canvas)
         style.configure("Hero.TFrame", background=surface)
@@ -233,7 +234,9 @@ class FolderDesktop:
         )
         style.map(
             "Primary.TButton",
-            foreground=[("disabled", "#8994a3"), ("!disabled", "#ffffff")],
+            # Native Windows themes ignore custom button backgrounds. Keep the
+            # enabled label visible there instead of producing white-on-white.
+            foreground=[("disabled", "#8994a3"), ("!disabled", native_primary_foreground)],
             background=[("disabled", "#d8dee7"), ("!disabled", accent), ("active", "#125aa8")],
         )
         style.configure("TEntry", padding=5)
