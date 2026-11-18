@@ -6,10 +6,38 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from folder_desktop_app import FolderDesktop, action_label, preview_count
+from folder_desktop_app import (
+    FolderDesktop,
+    action_label,
+    parse_store_capture_request,
+    preview_count,
+)
 
 
 class ConsumerUIHelpersTests(unittest.TestCase):
+    def test_store_capture_hook_is_fail_closed_outside_disposable_ci(self):
+        args = [
+            "--store-capture-state", "setup", "--store-capture-root", "TeamArchive",
+            "--store-capture-ready", "TeamArchive/.capture-ready-setup",
+        ]
+        with self.assertRaisesRegex(ValueError, "disposable GitHub-hosted Windows"):
+            parse_store_capture_request(args, {})
+
+    def test_normal_launch_does_not_enable_store_capture_hook(self):
+        self.assertIsNone(parse_store_capture_request([], {}))
+
+    def test_store_capture_hook_rejects_unknown_state_before_paths(self):
+        args = [
+            "--store-capture-state", "invented", "--store-capture-root", "TeamArchive",
+            "--store-capture-ready", "TeamArchive/.capture-ready-invented",
+        ]
+        environment = {
+            "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
+            "OS": "Windows_NT", "FOLDER_STORE_CAPTURE": "EXACT_PACKAGED_UI_V1",
+        }
+        with self.assertRaisesRegex(ValueError, "Unknown Store capture state"):
+            parse_store_capture_request(args, environment)
+
     def test_localized_actions_preserve_engine_codes(self):
         self.assertEqual(action_label("copy", "日本語"), "コピー（元を残す）")
         self.assertEqual(action_label("move", "English"), "Move (remove original)")
@@ -179,3 +207,4 @@ class ConsumerUIHelpersTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
