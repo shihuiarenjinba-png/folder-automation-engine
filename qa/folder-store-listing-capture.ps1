@@ -70,7 +70,9 @@ function Save-AppWindow([IntPtr]$Handle, [string]$File) {
     if (-not [FolderStoreCapture]::GetWindowRect($Handle,[ref]$rect)) { throw "GetWindowRect failed" }
     $width=$rect.Right-$rect.Left
     $height=$rect.Bottom-$rect.Top
-    if ($width -lt 720 -or $height -lt 570) { throw "Actual app window is below product QA minimum: ${width}x${height}" }
+    if ($width -lt 1366 -or $height -lt 768) {
+        throw "Native app window is below Store minimum; upscaling is prohibited: ${width}x${height}"
+    }
     $sourceBitmap=New-Object Drawing.Bitmap($width,$height)
     $printWindowOk=$false
     $outputWidth=$width
@@ -144,7 +146,8 @@ try {
             try {
                 $arguments=@("--store-capture-state",$state,"--store-capture-root",$fixtureRoot,
                              "--store-capture-ready",$ready)
-                $process=Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -ErrorAction Stop
+                $process=Start-Process -FilePath $exe -ArgumentList $arguments `
+                    -WorkingDirectory ([IO.Path]::GetPathRoot($exe)) -PassThru -ErrorAction Stop
                 $deadline=[DateTime]::UtcNow.AddSeconds(30)
                 do {
                     Start-Sleep -Milliseconds 200
