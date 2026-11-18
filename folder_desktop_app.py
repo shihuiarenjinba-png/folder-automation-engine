@@ -1058,7 +1058,9 @@ def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready
     app.build()
     # 1362x729 client area produces a 1366x768 outer window on the hosted
     # Windows runner. Store captures must use native pixels, never upscaling.
-    app.root.geometry("1362x729")
+    app.root.maxsize(2000, 1600)
+    app.root.geometry("1362x729+0+0")
+    app.root.update_idletasks()
 
     def show_advanced() -> None:
         app.root.update_idletasks()
