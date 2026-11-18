@@ -8,8 +8,10 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import queue
 import re
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -22,6 +24,38 @@ from ui_preferences import load_preferences, save_preferences
 _GUI_PREF_PRODUCT = "FolderAutomationEngine"
 _GUI_PREF_FIELDS = ("locale",)
 _GUI_LANGUAGES = ("日本語", "English")
+_STORE_CAPTURE_STATES = frozenset({"setup", "multi-rule", "preview", "result", "automatic-ready"})
+
+
+def parse_store_capture_request(argv: list[str], environ: dict[str, str]) -> tuple[str, Path, Path] | None:
+    """Accept the screenshot fixture only on a disposable GitHub Windows runner.
+
+    The production executable contains this narrow test hook so Store images can
+    be captured from the exact packaged binary. It cannot be enabled by normal
+    command-line arguments alone and it is restricted to one fixed disposable
+    fixture folder.
+    """
+    if not argv or argv[0] != "--store-capture-state":
+        return None
+    if len(argv) != 6 or argv[2] != "--store-capture-root" or argv[4] != "--store-capture-ready":
+        raise ValueError("Invalid Store capture arguments")
+    if not (
+        environ.get("GITHUB_ACTIONS") == "true"
+        and environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+        and environ.get("OS") == "Windows_NT"
+        and environ.get("FOLDER_STORE_CAPTURE") == "EXACT_PACKAGED_UI_V1"
+    ):
+        raise ValueError("Store capture is restricted to disposable GitHub-hosted Windows")
+    state = argv[1]
+    if state not in _STORE_CAPTURE_STATES:
+        raise ValueError("Unknown Store capture state")
+    fixture = Path(argv[3]).resolve(strict=True)
+    ready = Path(argv[5]).resolve(strict=False)
+    if fixture.name != "TeamArchive" or fixture.parent != Path(fixture.anchor):
+        raise ValueError("Store capture fixture must be the fixed drive-root TeamArchive folder")
+    if ready.parent != fixture or ready.name != f".capture-ready-{state}":
+        raise ValueError("Store capture ready marker must stay inside the fixed fixture")
+    return state, fixture, ready
 
 
 def load_gui_language() -> str:
@@ -102,6 +136,7 @@ class FolderDesktop:
         self.status = tk.StringVar(value="")
         self.preview_summary = tk.StringVar(value="")
         self.watch_indicator = tk.StringVar(value="")
+        self.rules_summary = tk.StringVar(value="")
         self.advanced_visible = False
         self.preview_revision: str | None = None
         self.preview_input_snapshot: tuple | None = None
@@ -111,6 +146,8 @@ class FolderDesktop:
         self.watch_thread: threading.Thread | None = None
         self.worker_thread: threading.Thread | None = None
         self.closing = False
+        self.store_capture_state: str | None = None
+        self.store_capture_ready_file: Path | None = None
         self.watch_seconds = tk.StringVar(value="60")
         self.messages: queue.Queue[tuple[str, bool, str, str, tuple | None]] = queue.Queue()
         self.build()
@@ -121,6 +158,12 @@ class FolderDesktop:
 
     def t(self, ja: str, en: str) -> str:
         return en if self.lang.get() == "English" else ja
+
+    def _mark_store_capture_ready(self, state: str) -> None:
+        """Signal the external CI capturer after the requested real UI state exists."""
+        ready = getattr(self, "store_capture_ready_file", None)
+        if getattr(self, "store_capture_state", None) == state and ready is not None:
+            ready.write_text("ready\n", encoding="utf-8")
 
     def _configure_styles(self) -> None:
         """Apply a restrained Store-ready visual system without changing behavior."""
@@ -240,6 +283,7 @@ class FolderDesktop:
         formhost = ttk.Frame(shell, style="App.TFrame")
         formhost.pack(fill="both", expand=True, padx=18, pady=(16, 0))
         canvas = tk.Canvas(formhost, highlightthickness=0, bg="#f3f6fa")
+        self.form_canvas = canvas
         scrollbar = ttk.Scrollbar(formhost, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
@@ -383,6 +427,12 @@ class FolderDesktop:
         self.advanced_panel = ttk.Frame(frame)
         if self.advanced_visible:
             self.advanced_panel.pack(fill="x", pady=(0, 8))
+        self._update_rules_summary()
+        ttk.Label(
+            self.advanced_panel,
+            textvariable=self.rules_summary,
+            style="Muted.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
         self.rules_btn = ttk.Button(self.advanced_panel,
             text=self.t("複数ルールの追加・並べ替え（最大10件）",
                         "Add and reorder rules (up to 10)"), command=self.manage_rules)
@@ -410,6 +460,13 @@ class FolderDesktop:
             "Safe workflow: preview first, then approve copy or move. Turn on automatic organizing only when you need it.",
         ), wraplength=820).pack(anchor="w", pady=(8, 0))
         self.set_busy(self.busy)
+
+    def _update_rules_summary(self) -> None:
+        total = 1 + len(getattr(self, "extra_rules", []))
+        self.rules_summary.set(self.t(
+            f"現在のルール：{total}件（上から順に最初の一致を適用）",
+            f"Current rules: {total} (first match wins, in order)",
+        ))
 
     def change_language(self, _event=None) -> None:
         if self.busy or self.watch_active:
@@ -543,6 +600,7 @@ class FolderDesktop:
                                      str(exc), parent=dialog)
                 return
             self.extra_rules = draft
+            self._update_rules_summary()
             self.preview_revision = None
             self.preview_input_snapshot = None
             self.status.set(self.t(
@@ -883,6 +941,8 @@ class FolderDesktop:
                         "Preview complete." if self.preview_revision else
                         "Input files changed; preview again."))
                     self.set_busy(False)
+                    if self.preview_revision:
+                        self._mark_store_capture_ready("preview")
                 elif ok:
                     self.status.set(self.t("実行が完了しました。", "Execution completed."))
                     if getattr(self, "preview_summary", None) is not None:
@@ -963,6 +1023,104 @@ class FolderDesktop:
             messagebox.showerror(self.t("保存エラー", "Save failed"), str(exc), parent=self.root)
 
 
+def _capture_preview_sync(app: FolderDesktop) -> tuple[dict, tuple, int, str]:
+    """Run the real engine Dry Run against only the fixed Store fixture."""
+    config = app.get_config()
+    sampled = snapshot_inputs(config)
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        count = Engine(config, dry_run=True).scan_once()
+    if snapshot_inputs(config) != sampled:
+        raise ConfigError("Store capture fixture changed during Dry Run")
+    return config, sampled, count, buffer.getvalue()
+
+
+def configure_store_capture(app: FolderDesktop, state: str, fixture: Path, ready: Path) -> None:
+    """Prepare truthful Store views from real operations in a disposable fixture."""
+    app.store_capture_state = state
+    app.store_capture_ready_file = ready
+    app.root_path.set(str(fixture))
+    app.input_folder.set("Incoming")
+    app.output_folder.set("Documents")
+    app.pattern.set("*.pdf")
+    app.action.set("copy")
+    app.extra_rules = [] if state == "setup" else [
+        {"glob": "*.csv", "destination": "Spreadsheets", "action": "copy"},
+        {"glob": "*.png", "destination": "Images", "action": "copy"},
+    ]
+    app.advanced_visible = state in {"multi-rule", "automatic-ready"}
+    app.build()
+
+    def show_advanced() -> None:
+        app.root.update_idletasks()
+        app.form_canvas.yview_moveto(1.0)
+
+    if state == "setup":
+        app.status.set(app.t(
+            "例：受信フォルダーのPDFを、元を残して書類フォルダーへ整理します。",
+            "Example: copy incoming PDFs into Documents while keeping the originals.",
+        ))
+        app.root.after(200, lambda: app._mark_store_capture_ready(state))
+        return
+    if state == "multi-rule":
+        app.preview_summary.set(app.t(
+            "PDF・CSV・PNGを3つの行き先へ整理するルールを設定済みです。",
+            "Three ordered rules are ready for PDF, CSV, and PNG files.",
+        ))
+        app.status.set(app.t(
+            "複数ルールは上から順に評価し、最初に一致した1件だけを適用します。",
+            "Rules are evaluated in order and only the first match is applied.",
+        ))
+        app.root.after(50, show_advanced)
+        app.root.after(250, lambda: app._mark_store_capture_ready(state))
+        return
+    if state == "preview":
+        app.root.after(200, app.preview)
+        return
+
+    def render_result() -> None:
+        config, sampled, _preview_count, _preview_log = _capture_preview_sync(app)
+        if snapshot_inputs(config) != sampled:
+            raise ConfigError("Store capture fixture changed after Dry Run")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            count = Engine(config, dry_run=False).scan_once()
+        app.append(format_activity(f"{count} file(s)\n{buffer.getvalue()}",
+                                   japanese=app.lang.get() == "日本語"))
+        app.preview_revision = None
+        app.preview_input_snapshot = None
+        app.preview_summary.set(app.t(
+            f"整理完了：{count}件。元ファイルを残したままコピーしました。",
+            f"Organizing complete: {count} file(s) copied; originals were kept.",
+        ))
+        app.status.set(app.t(
+            "処理が完了しました。既存ファイルは上書きしていません。",
+            "Processing finished without overwriting existing files.",
+        ))
+        app.set_busy(False)
+        app._mark_store_capture_ready(state)
+
+    def render_automatic_ready() -> None:
+        config, sampled, count, preview_log = _capture_preview_sync(app)
+        app.preview_revision = revision(config)
+        app.preview_input_snapshot = sampled
+        app.append(format_activity(f"{count} file(s)\n{preview_log}",
+                                   japanese=app.lang.get() == "日本語"))
+        app.preview_summary.set(app.t(
+            f"試運転完了：対象 {count} 件。自動整理を開始できる状態です。",
+            f"Preview complete: {count} file(s). Automatic organizing is ready to start.",
+        ))
+        app.status.set(app.t(
+            "確認済みルールで、新しく届くファイルも整理できます。",
+            "The verified rules can also organize newly arriving files.",
+        ))
+        app.set_busy(False)
+        show_advanced()
+        app._mark_store_capture_ready(state)
+
+    app.root.after(200, render_result if state == "result" else render_automatic_ready)
+
+
 def self_test() -> int:
     """Exercise installed engine wiring without opening windows or touching user files."""
     import tempfile
@@ -985,14 +1143,20 @@ def self_test() -> int:
     return 0
 
 
-def main() -> None:
+def main(capture_request: tuple[str, Path, Path] | None = None) -> None:
     root = tk.Tk()
-    FolderDesktop(root)
+    app = FolderDesktop(root)
+    if capture_request is not None:
+        configure_store_capture(app, *capture_request)
     root.mainloop()
 
 
 if __name__ == "__main__":
-    import sys
     if sys.argv[1:] == ["--self-test"]:
         raise SystemExit(self_test())
-    main()
+    try:
+        request = parse_store_capture_request(sys.argv[1:], dict(os.environ))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    main(request)
+
